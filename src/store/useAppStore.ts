@@ -26,6 +26,9 @@ export type PaintTool =
   | { kind: 'shelf'; shelfId: string }
   | { kind: 'node'; nodeKind: NodeKind; name: string; groupId?: string }
 
+/** 1回の描画操作で戻せる履歴の深さ */
+const MAP_HISTORY_LIMIT = 20
+
 export interface AppState {
   stores: StoreMap[]
   lists: ShoppingList[]
@@ -34,6 +37,8 @@ export interface AppState {
   aliases: Record<string, string>
   activeListId: string | null
   tab: Tab
+  /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
+  mapHistory: Record<string, StoreMap[]>
 
   setTab: (tab: Tab) => void
 
@@ -75,6 +80,8 @@ export interface AppState {
   deleteShelf: (storeId: string, shelfId: string) => void
   updateNode: (storeId: string, nodeId: string, patch: Partial<Omit<MapNode, 'id' | 'floorId'>>) => void
   paint: (storeId: string, floorId: string, cells: Array<{ x: number; y: number }>, tool: PaintTool) => void
+  /** 直前の paint 操作を1回取り消す */
+  undoMap: (storeId: string) => void
   cleanupMap: (storeId: string) => void
 
   replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases'>>) => void
@@ -95,6 +102,7 @@ function initialState() {
     aliases: {} as Record<string, string>,
     activeListId: list.id,
     tab: 'list' as Tab,
+    mapHistory: {} as Record<string, StoreMap[]>,
   }
 }
 
@@ -422,44 +430,72 @@ export const useAppStore = create<AppState>()(
         })),
 
       paint: (storeId, floorId, cells, tool) =>
-        set((s) => ({
-          stores: mapStore(s.stores, storeId, (st) => {
-            const floor = st.floors.find((f) => f.id === floorId)
-            if (!floor) return st
-            const nextCells = [...floor.cells]
-            const addedNodes: MapNode[] = []
-            for (const { x, y } of cells) {
-              if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) continue
-              const at = y * floor.width + x
-              if (tool.kind === 'shelf') {
-                nextCells[at] = { k: 'shelf', shelfId: tool.shelfId }
-              } else if (tool.kind === 'node') {
-                const existing = nextCells[at]
-                if (existing.k === 'node') continue
-                const id = newId('node')
-                addedNodes.push({
-                  id,
-                  floorId,
-                  kind: tool.nodeKind,
-                  name: tool.name,
-                  groupId: tool.groupId,
-                })
-                nextCells[at] = { k: 'node', nodeId: id }
-              } else {
-                nextCells[at] = { k: tool.kind }
+        set((s) => {
+          const before = s.stores.find((st) => st.id === storeId)
+          const mapHistory = before
+            ? {
+                ...s.mapHistory,
+                [storeId]: [...(s.mapHistory[storeId] ?? []).slice(-(MAP_HISTORY_LIMIT - 1)), before],
               }
-            }
-            const floors = st.floors.map((f) => (f.id === floorId ? { ...f, cells: nextCells } : f))
-            const withNodes = { ...st, floors, nodes: [...st.nodes, ...addedNodes] }
-            const pruned = pruneOrphans(withNodes)
-            // 塗り始めたばかりの空の棚は残す
-            const keep = tool.kind === 'shelf' ? st.shelves.find((sh) => sh.id === tool.shelfId) : undefined
-            if (keep && !pruned.shelves.some((sh) => sh.id === keep.id)) {
-              return { ...pruned, shelves: [...pruned.shelves, keep] }
-            }
-            return pruned
-          }),
-        })),
+            : s.mapHistory
+          return {
+            mapHistory,
+            stores: mapStore(s.stores, storeId, (st) => {
+              const floor = st.floors.find((f) => f.id === floorId)
+              if (!floor) return st
+              const nextCells = [...floor.cells]
+              const addedNodes: MapNode[] = []
+              // 新規棚 (まだ st.shelves に無い shelfId) は、塗りつぶしと同じ操作としてここで作る。
+              // createShelf を別呼び出しにすると、その分だけ undo 履歴が余計に増えてしまうため。
+              let shelves = st.shelves
+              if (tool.kind === 'shelf' && !shelves.some((sh) => sh.id === tool.shelfId)) {
+                const n = shelves.filter((sh) => sh.floorId === floorId).length + 1
+                shelves = [...shelves, { id: tool.shelfId, floorId, name: `棚${n}`, categoryIds: [] }]
+              }
+              for (const { x, y } of cells) {
+                if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) continue
+                const at = y * floor.width + x
+                if (tool.kind === 'shelf') {
+                  nextCells[at] = { k: 'shelf', shelfId: tool.shelfId }
+                } else if (tool.kind === 'node') {
+                  const existing = nextCells[at]
+                  if (existing.k === 'node') continue
+                  const id = newId('node')
+                  addedNodes.push({
+                    id,
+                    floorId,
+                    kind: tool.nodeKind,
+                    name: tool.name,
+                    groupId: tool.groupId,
+                  })
+                  nextCells[at] = { k: 'node', nodeId: id }
+                } else {
+                  nextCells[at] = { k: tool.kind }
+                }
+              }
+              const floors = st.floors.map((f) => (f.id === floorId ? { ...f, cells: nextCells } : f))
+              const withNodes = { ...st, floors, shelves, nodes: [...st.nodes, ...addedNodes] }
+              const pruned = pruneOrphans(withNodes)
+              // 塗り始めたばかりの空の棚は残す
+              const keep = tool.kind === 'shelf' ? shelves.find((sh) => sh.id === tool.shelfId) : undefined
+              if (keep && !pruned.shelves.some((sh) => sh.id === keep.id)) {
+                return { ...pruned, shelves: [...pruned.shelves, keep] }
+              }
+              return pruned
+            }),
+          }
+        }),
+
+      undoMap: (storeId) =>
+        set((s) => {
+          const hist = s.mapHistory[storeId]
+          if (!hist || hist.length === 0) return {}
+          const prev = hist[hist.length - 1]
+          return {
+            mapHistory: { ...s.mapHistory, [storeId]: hist.slice(0, -1) },
+            stores: s.stores.map((st) => (st.id === storeId ? prev : st)),
+          }
+        }),
 
       cleanupMap: (storeId) => set((s) => ({ stores: mapStore(s.stores, storeId, (st) => pruneOrphans(st)) })),
 

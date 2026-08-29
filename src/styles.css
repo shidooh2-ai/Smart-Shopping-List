@@ -620,6 +620,7 @@ label.field > span {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  padding-top: max(48px, env(safe-area-inset-top, 0px));
   background: rgba(0, 0, 0, 0.42);
   z-index: 60;
   display: flex;
@@ -632,7 +633,7 @@ label.field > span {
   width: 100%;
   max-width: 640px;
   border-radius: 18px 18px 0 0;
-  max-height: 86vh;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -667,7 +668,10 @@ label.field > span {
 }
 
 .sheet .content {
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 14px 16px 20px;
 }
 

@@ -11,16 +11,31 @@ export interface MapViewProps {
   plan?: RoutePlan | null
   /** 強調表示する立ち寄り番号 */
   activeStop?: number | null
-  /** 塗りつぶし操作。指定するとドラッグでマスを塗る (未指定ならドラッグは移動) */
+  /**
+   * 塗りつぶし操作。指定するとドラッグで矩形を選び、指を離した時点で
+   * まとめて塗る (未指定ならドラッグは地図の移動)。
+   */
   onPaint?: (cells: Array<{ x: number; y: number }>) => void
+  /**
+   * 'area': ドラッグした範囲をまとめて塗る (棚・通路・壁向け)。
+   * 'point': 指を置いた位置に1マスだけ配置し、離すまで位置を調整できる (設備向け)。
+   */
+  paintMode?: 'area' | 'point'
   /** マスのタップ (塗りつぶし無効時のみ発火) */
   onTapCell?: (x: number, y: number) => void
   /** 枠線を強調する棚 */
   selectedShelfId?: string | null
+  /** ドラッグ中のプレビュー色 (塗りつぶし有効時) */
+  paintPreviewColor?: string
   height?: number
 }
 
 interface Pointer {
+  x: number
+  y: number
+}
+
+interface CellPos {
   x: number
   y: number
 }
@@ -35,16 +50,19 @@ export function MapView({
   plan = null,
   activeStop = null,
   onPaint,
+  paintMode = 'area',
   onTapCell,
   selectedShelfId = null,
+  paintPreviewColor = 'var(--accent)',
   height = 320,
 }: MapViewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pointers = useRef(new Map<number, Pointer>())
   const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null)
-  const painted = useRef(new Set<string>())
+  const dragStart = useRef<CellPos | null>(null)
   const moved = useRef(false)
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
+  const [dragCell, setDragCell] = useState<CellPos | null>(null)
 
   const viewW = floor.width * CELL
   const viewH = floor.height * CELL
@@ -80,6 +98,20 @@ export function MapView({
     }
   }
 
+  /** dragStart〜dragCell の矩形に含まれる全マスを返す (point モードなら1マスのみ)。 */
+  const rectCells = (a: CellPos, b: CellPos): CellPos[] => {
+    if (paintMode === 'point') return [b]
+    const x0 = Math.min(a.x, b.x)
+    const x1 = Math.max(a.x, b.x)
+    const y0 = Math.min(a.y, b.y)
+    const y1 = Math.max(a.y, b.y)
+    const cells: CellPos[] = []
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) cells.push({ x, y })
+    }
+    return cells
+  }
+
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -91,14 +123,16 @@ export function MapView({
         cx: (a.x + b.x) / 2,
         cy: (a.y + b.y) / 2,
       }
-      painted.current.clear()
+      // 2本目の指が触れたら塗り操作は取り消してズームに切り替える
+      dragStart.current = null
+      setDragCell(null)
       return
     }
     if (onPaint) {
       const cell = toCell(e.clientX, e.clientY)
       if (cell) {
-        painted.current = new Set([`${cell.x},${cell.y}`])
-        onPaint([cell])
+        dragStart.current = cell
+        setDragCell(cell)
       }
     }
   }
@@ -141,17 +175,13 @@ export function MapView({
     const dy = e.clientY - prev.y
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) moved.current = true
 
-    if (onPaint) {
+    if (onPaint && dragStart.current) {
       const cell = toCell(e.clientX, e.clientY)
-      if (cell) {
-        const key = `${cell.x},${cell.y}`
-        if (!painted.current.has(key)) {
-          painted.current.add(key)
-          onPaint([cell])
-        }
-      }
+      if (cell) setDragCell(cell)
       return
     }
+
+    if (onPaint) return
 
     const svg = svgRef.current
     if (!svg) return
@@ -163,11 +193,18 @@ export function MapView({
     const had = pointers.current.get(e.pointerId)
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinch.current = null
+
+    if (onPaint && dragStart.current && had) {
+      const end = toCell(e.clientX, e.clientY) ?? dragCell ?? dragStart.current
+      onPaint(rectCells(dragStart.current, end))
+    }
+    dragStart.current = null
+    setDragCell(null)
+
     if (!onPaint && onTapCell && had && !moved.current) {
       const cell = toCell(e.clientX, e.clientY)
       if (cell) onTapCell(cell.x, cell.y)
     }
-    if (pointers.current.size === 0) painted.current.clear()
   }
 
   const zoomBy = (k: number) =>
@@ -376,6 +413,33 @@ export function MapView({
               fill="#ef6c00"
               stroke="#fff"
               strokeWidth={1.5}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
+          {dragStart.current && dragCell && paintMode === 'point' && (
+            <rect
+              x={dragCell.x * CELL}
+              y={dragCell.y * CELL}
+              width={CELL}
+              height={CELL}
+              fill={paintPreviewColor}
+              fillOpacity={0.55}
+              stroke={paintPreviewColor}
+              strokeWidth={2}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+          {dragStart.current && dragCell && paintMode === 'area' && (
+            <rect
+              x={Math.min(dragStart.current.x, dragCell.x) * CELL}
+              y={Math.min(dragStart.current.y, dragCell.y) * CELL}
+              width={(Math.abs(dragStart.current.x - dragCell.x) + 1) * CELL}
+              height={(Math.abs(dragStart.current.y - dragCell.y) + 1) * CELL}
+              fill={paintPreviewColor}
+              fillOpacity={0.35}
+              stroke={paintPreviewColor}
+              strokeWidth={2}
               style={{ pointerEvents: 'none' }}
             />
           )}

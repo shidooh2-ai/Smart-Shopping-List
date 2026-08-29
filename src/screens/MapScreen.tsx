@@ -4,6 +4,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
 import { cellAt, nodePos } from '../lib/grid'
+import { newId } from '../lib/id'
 import { NODE_STYLE } from '../lib/mapStyle'
 import { type PaintTool, useAppStore } from '../store/useAppStore'
 import type { NodeKind, StoreMap } from '../types'
@@ -24,6 +25,19 @@ const TOOLS: Array<{ id: ToolId; label: string; swatch: string }> = [
 const isNodeTool = (t: ToolId): t is NodeKind =>
   t === 'entrance' || t === 'checkout' || t === 'stairs' || t === 'elevator'
 
+const previewColorFor = (t: ToolId): string => {
+  if (isNodeTool(t)) return NODE_STYLE[t].color
+  if (t === 'wall') return '#5b6068'
+  if (t === 'aisle') return '#c62828'
+  return 'var(--accent)'
+}
+
+const hintFor = (t: ToolId): string => {
+  if (t === 'select') return '棚や設備をタップすると設定できます。ドラッグで地図を動かせます。'
+  if (isNodeTool(t)) return '置きたいマスを指で押さえたまま動かして位置を決め、離すと配置されます。'
+  return 'ドラッグで範囲を囲み、指を離すとまとめて塗れます。1マスだけならタップでもOK。'
+}
+
 export function MapScreen() {
   const stores = useAppStore((s) => s.stores)
   const categories = useAppStore((s) => s.categories)
@@ -37,11 +51,11 @@ export function MapScreen() {
     updateFloor,
     resizeFloor,
     deleteFloor,
-    createShelf,
     updateShelf,
     deleteShelf,
     updateNode,
     paint,
+    undoMap,
     cleanupMap,
   } = useAppStore()
 
@@ -60,6 +74,7 @@ export function MapScreen() {
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
+  const canUndo = useAppStore((s) => (store ? (s.mapHistory[store.id]?.length ?? 0) > 0 : false))
 
   const switchToStore = (id: string) => {
     setStoreId(id)
@@ -111,9 +126,11 @@ export function MapScreen() {
   const handlePaint = (cells: Array<{ x: number; y: number }>) => {
     let payload: PaintTool
     if (tool === 'shelf') {
+      // 新規棚のIDはここで払い出すだけ。実際の追加は paint() の中で塗りつぶしと
+      // 同じ操作として行われるので、undo が1回で済む。
       let id = shelfRef.current
       if (!id) {
-        id = createShelf(store.id, floor.id)
+        id = newId('shelf')
         shelfRef.current = id
         setShelfId(id)
       }
@@ -180,20 +197,24 @@ export function MapScreen() {
           floor={floor}
           categories={categories}
           onPaint={tool === 'select' ? undefined : handlePaint}
+          paintMode={isNodeTool(tool) ? 'point' : 'area'}
+          paintPreviewColor={previewColorFor(tool)}
           onTapCell={tool === 'select' ? handleTapCell : undefined}
           selectedShelfId={tool === 'shelf' ? shelfId : null}
-          height={340}
+          height={420}
         />
 
         <p className="muted" style={{ margin: '8px 0 0' }}>
-          {tool === 'select'
-            ? '棚や設備をタップすると設定できます。ドラッグで地図を動かせます。'
-            : 'ドラッグでまとめて塗れます。2本指で拡大・移動できます。'}
+          {hintFor(tool)}
         </p>
-      </div>
 
-      <div className="card">
-        <h2>ツール</h2>
+        <div className="row" style={{ marginTop: 12, marginBottom: 2 }}>
+          <h2 style={{ margin: 0 }}>ツール</h2>
+          <span className="spacer" />
+          <button type="button" className="btn slim" disabled={!canUndo} onClick={() => store && undoMap(store.id)}>
+            ↶ 元に戻す
+          </button>
+        </div>
         <div className="tools">
           {TOOLS.map((t) => (
             <button
