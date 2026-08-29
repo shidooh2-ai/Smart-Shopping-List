@@ -43,6 +43,8 @@ html,
 body,
 #root {
   height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 body {
@@ -69,9 +71,11 @@ textarea {
   display: flex;
   flex-direction: column;
   height: 100%;
+  height: 100dvh;
   max-width: 640px;
   margin: 0 auto;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .appbar {
@@ -107,7 +111,9 @@ textarea {
 
 .screen {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 12px 12px 24px;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AddStoreSheet } from '../components/AddStoreSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
@@ -53,11 +54,19 @@ export function MapScreen() {
   const [nodeSheet, setNodeSheet] = useState<string | null>(null)
   const [floorSheet, setFloorSheet] = useState(false)
   const [storeSheet, setStoreSheet] = useState(false)
+  const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [catPicker, setCatPicker] = useState(false)
   const shelfRef = useRef<string | null>(null)
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
+
+  const switchToStore = (id: string) => {
+    setStoreId(id)
+    setFloorId(null)
+    setShelfId(null)
+    shelfRef.current = null
+  }
 
   // 編集を離れたら、マスを持たない棚やノードを片付ける
   useEffect(() => {
@@ -83,10 +92,10 @@ export function MapScreen() {
         <div className="empty">
           店舗マップがありません。
           <div className="row" style={{ justifyContent: 'center', marginTop: 12 }}>
-            <button type="button" className="btn primary" onClick={() => setStoreId(createStore('マイスーパー'))}>
+            <button type="button" className="btn primary" onClick={() => switchToStore(createStore('マイスーパー'))}>
               白紙から作る
             </button>
-            <button type="button" className="btn" onClick={() => setStoreId(addSampleStore())}>
+            <button type="button" className="btn" onClick={() => switchToStore(addSampleStore())}>
               サンプルを入れる
             </button>
           </div>
@@ -135,22 +144,16 @@ export function MapScreen() {
     <div className="screen">
       <div className="card">
         <div className="row">
-          <select
-            value={store.id}
-            onChange={(e) => {
-              setStoreId(e.target.value)
-              setFloorId(null)
-              setShelfId(null)
-              shelfRef.current = null
-            }}
-            style={{ flex: 1 }}
-          >
+          <select value={store.id} onChange={(e) => switchToStore(e.target.value)} style={{ flex: 1 }}>
             {stores.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
           </select>
+          <button type="button" className="btn slim" onClick={() => setAddStoreSheet(true)}>
+            ＋ 追加
+          </button>
           <button type="button" className="btn slim" onClick={() => setStoreSheet(true)}>
             店舗設定
           </button>
@@ -537,14 +540,6 @@ export function MapScreen() {
             onChange={(e) => setCellMeters(store.id, Number(e.target.value) || 1.2)}
           />
         </label>
-        <div className="row wrap">
-          <button type="button" className="btn" onClick={() => setStoreId(createStore('新しい店舗'))}>
-            別の店舗を作る
-          </button>
-          <button type="button" className="btn" onClick={() => setStoreId(addSampleStore())}>
-            サンプル店舗を追加
-          </button>
-        </div>
         {stores.length > 1 && (
           <button
             type="button"
@@ -560,6 +555,13 @@ export function MapScreen() {
           </button>
         )}
       </Sheet>
+
+      <AddStoreSheet
+        open={addStoreSheet}
+        onClose={() => setAddStoreSheet(false)}
+        onCreate={(name) => switchToStore(createStore(name))}
+        onCreateSample={() => switchToStore(addSampleStore())}
+      />
     </div>
   )
 }

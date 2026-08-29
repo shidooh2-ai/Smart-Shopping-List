@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { AddStoreSheet } from '../components/AddStoreSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { Sheet } from '../components/Sheet'
 import { useActiveList, useAppStore } from '../store/useAppStore'
@@ -24,12 +25,15 @@ export function ListScreen() {
     renameList,
     setActiveList,
     setTab,
+    createStore,
+    addSampleStore,
   } = useAppStore()
 
   const [draft, setDraft] = useState('')
   const [grouped, setGrouped] = useState(true)
   const [pickerItem, setPickerItem] = useState<string | null>(null)
   const [listSheet, setListSheet] = useState(false)
+  const [addStoreSheet, setAddStoreSheet] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -81,9 +85,15 @@ export function ListScreen() {
             リスト管理
           </button>
         </div>
-        <label className="field" style={{ marginBottom: 0 }}>
-          <span>買い物する店舗</span>
-          <select value={list.storeId ?? ''} onChange={(e) => setListStore(list.id, e.target.value || null)}>
+        <span className="muted" style={{ display: 'block', marginBottom: 4 }}>
+          買い物する店舗
+        </span>
+        <div className="row" style={{ marginBottom: 0 }}>
+          <select
+            value={list.storeId ?? ''}
+            onChange={(e) => setListStore(list.id, e.target.value || null)}
+            style={{ flex: 1 }}
+          >
             <option value="">（未選択）</option>
             {stores.map((s) => (
               <option key={s.id} value={s.id}>
@@ -91,16 +101,27 @@ export function ListScreen() {
               </option>
             ))}
           </select>
-        </label>
+          <button type="button" className="btn slim" onClick={() => setAddStoreSheet(true)}>
+            ＋ 追加
+          </button>
+        </div>
         {!list.storeId && (
-          <p className="muted" style={{ marginBottom: 0 }}>
-            店舗を選ぶとルートを作成できます。
-            <button type="button" className="btn slim" style={{ marginLeft: 6 }} onClick={() => setTab('map')}>
-              マップを作る
+          <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
+            店舗を選ぶとルートを作成できます。マップの作り方は
+            <button type="button" className="btn slim" style={{ margin: '0 4px' }} onClick={() => setTab('map')}>
+              マップ画面
             </button>
+            から。
           </p>
         )}
       </div>
+
+      <AddStoreSheet
+        open={addStoreSheet}
+        onClose={() => setAddStoreSheet(false)}
+        onCreate={(name) => setListStore(list.id, createStore(name))}
+        onCreateSample={() => setListStore(list.id, addSampleStore())}
+      />
 
       <div className="card">
         <div className="additem">
