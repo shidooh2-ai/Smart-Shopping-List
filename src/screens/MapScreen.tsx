@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AddStoreSheet } from '../components/AddStoreSheet'
+import { AiFloorPlanSheet } from '../components/AiFloorPlanSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
@@ -56,6 +57,7 @@ export function MapScreen() {
     updateNode,
     paint,
     undoMap,
+    importFloorLayout,
     cleanupMap,
   } = useAppStore()
 
@@ -70,6 +72,7 @@ export function MapScreen() {
   const [storeSheet, setStoreSheet] = useState(false)
   const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [catPicker, setCatPicker] = useState(false)
+  const [aiSheet, setAiSheet] = useState(false)
   const shelfRef = useRef<string | null>(null)
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
@@ -186,6 +189,20 @@ export function MapScreen() {
           ))}
           <button type="button" onClick={() => setFloorId(addFloor(store.id))}>
             ＋階を追加
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const hasContent = store.shelves.some((s) => s.floorId === floor.id) || floor.cells.some((c) => c.k !== 'aisle')
+              if (
+                !hasContent ||
+                window.confirm(`${floor.name} の内容を見取り図から作り直します。今の内容は上書きされます（後で「元に戻す」も使えます）。よろしいですか？`)
+              ) {
+                setAiSheet(true)
+              }
+            }}
+          >
+            📷 見取り図から作成
           </button>
           <button type="button" onClick={() => setFloorSheet(true)}>
             ⚙ {floor.name}の設定
@@ -582,6 +599,14 @@ export function MapScreen() {
         onClose={() => setAddStoreSheet(false)}
         onCreate={(name) => switchToStore(createStore(name))}
         onCreateSample={() => switchToStore(addSampleStore())}
+      />
+
+      <AiFloorPlanSheet
+        open={aiSheet}
+        onClose={() => setAiSheet(false)}
+        categories={categories}
+        floorId={floor.id}
+        onGenerated={(layout) => importFloorLayout(store.id, floor.id, layout)}
       />
     </div>
   )

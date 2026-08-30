@@ -80,7 +80,16 @@ export interface AppState {
   deleteShelf: (storeId: string, shelfId: string) => void
   updateNode: (storeId: string, nodeId: string, patch: Partial<Omit<MapNode, 'id' | 'floorId'>>) => void
   paint: (storeId: string, floorId: string, cells: Array<{ x: number; y: number }>, tool: PaintTool) => void
-  /** 直前の paint 操作を1回取り消す */
+  /**
+   * フロアの内容をまとめて置き換える (AIによる見取り図の自動生成などに使う)。
+   * paint と同じ履歴に積まれ、1回のundoで元に戻せる。
+   */
+  importFloorLayout: (
+    storeId: string,
+    floorId: string,
+    layout: { width: number; height: number; cells: Cell[]; shelves: Shelf[]; nodes: MapNode[] },
+  ) => void
+  /** 直前の paint / importFloorLayout 操作を1回取り消す */
   undoMap: (storeId: string) => void
   cleanupMap: (storeId: string) => void
 
@@ -482,6 +491,30 @@ export const useAppStore = create<AppState>()(
                 return { ...pruned, shelves: [...pruned.shelves, keep] }
               }
               return pruned
+            }),
+          }
+        }),
+
+      importFloorLayout: (storeId, floorId, layout) =>
+        set((s) => {
+          const before = s.stores.find((st) => st.id === storeId)
+          const mapHistory = before
+            ? {
+                ...s.mapHistory,
+                [storeId]: [...(s.mapHistory[storeId] ?? []).slice(-(MAP_HISTORY_LIMIT - 1)), before],
+              }
+            : s.mapHistory
+          return {
+            mapHistory,
+            stores: mapStore(s.stores, storeId, (st) => {
+              const floor = st.floors.find((f) => f.id === floorId)
+              if (!floor) return st
+              const floors = st.floors.map((f) =>
+                f.id === floorId ? { ...f, width: layout.width, height: layout.height, cells: layout.cells } : f,
+              )
+              const shelves = [...st.shelves.filter((sh) => sh.floorId !== floorId), ...layout.shelves]
+              const nodes = [...st.nodes.filter((n) => n.floorId !== floorId), ...layout.nodes]
+              return pruneOrphans({ ...st, floors, shelves, nodes })
             }),
           }
         }),
