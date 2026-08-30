@@ -1,29 +1,46 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import { z } from 'zod'
-import { type FloorPlanResult, ZONE_KINDS } from './aiFloorPlan'
+import { GoogleGenAI } from '@google/genai'
+import type { FloorPlanResult } from './aiFloorPlan'
 
 /**
- * Anthropic SDK と zod を使う部分だけを分離したモジュール。
+ * Google Gemini SDK を使う部分だけを分離したモジュール。
  * バンドルの初期読み込みを軽くするため、AI機能を実際に使う時だけ
  * 動的 import() で読み込む (AiFloorPlanSheet 参照)。
+ *
+ * 無料枠のある Gemini API を使う (Anthropic Claude には常設の無料枠が無いため)。
  */
 
-const ZoneSchema = z.object({
-  kind: z.enum(ZONE_KINDS).describe('この区画の種類'),
-  x0: z.number().min(0).max(1).describe('区画左端のX座標 (画像幅を1とした比率、左端=0)'),
-  y0: z.number().min(0).max(1).describe('区画上端のY座標 (画像高さを1とした比率、上端=0)'),
-  x1: z.number().min(0).max(1).describe('区画右端のX座標'),
-  y1: z.number().min(0).max(1).describe('区画下端のY座標'),
-  label: z
-    .string()
-    .optional()
-    .describe('その区画に書かれている文字・記号があればそのまま書き写す (例: "青果", "レジ", "1番レジ")。無ければ省略。'),
-})
+/** 無料枠を持つ現行の Gemini Flash モデル。画像入力・JSON構造化出力に対応。 */
+export const GEMINI_MODEL = 'gemini-2.5-flash'
 
-const FloorPlanSchema = z.object({
-  zones: z.array(ZoneSchema).max(400).describe('画像から読み取った区画の一覧。重なった場合は配列の後の方が優先される'),
-})
+const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
+
+const ZONE_SCHEMA = {
+  type: 'object',
+  properties: {
+    zones: {
+      type: 'array',
+      description: '画像から読み取った区画の一覧。重なった場合は配列の後の方が優先される',
+      maxItems: 400,
+      items: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: [...ZONE_KINDS], description: 'この区画の種類' },
+          x0: { type: 'number', minimum: 0, maximum: 1, description: '区画左端のX座標 (画像幅を1とした比率、左端=0)' },
+          y0: { type: 'number', minimum: 0, maximum: 1, description: '区画上端のY座標 (画像高さを1とした比率、上端=0)' },
+          x1: { type: 'number', minimum: 0, maximum: 1, description: '区画右端のX座標' },
+          y1: { type: 'number', minimum: 0, maximum: 1, description: '区画下端のY座標' },
+          label: {
+            type: 'string',
+            description:
+              'その区画に書かれている文字・記号があればそのまま書き写す (例: "青果", "レジ", "1番レジ")。無ければ省略。',
+          },
+        },
+        required: ['kind', 'x0', 'y0', 'x1', 'y1'],
+      },
+    },
+  },
+  required: ['zones'],
+} as const
 
 const PROMPT = `これはスーパーマーケットの店舗見取り図（手描き・印刷・CADいずれも可）の画像です。
 画像全体を横1.0×縦1.0とした相対座標（左上が(0,0)、右下が(1,1)）で、次の種類の区画をすべて矩形として書き出してください。
@@ -41,7 +58,8 @@ const PROMPT = `これはスーパーマーケットの店舗見取り図（手�
 - 通路や什器のない空間は自動的に通路として扱われるので、余白をすべて aisle で埋める必要はありません。棚と棚の間の明確な通路だけ書いてもらえれば十分です。
 - 壁は見取り図の外周や間仕切りの線に沿って、細長い矩形として表現してください。
 - 座標は画像の見た目どおりの位置にしてください。実物の縮尺や角度の補正は不要です。
-- 見取り図に写っていない要素は書かないでください。`
+- 見取り図に写っていない要素は書かないでください。
+- 必ず指定された JSON 形式だけで答えてください。`
 
 export interface AnalyzeFloorPlanOptions {
   apiKey: string
@@ -49,25 +67,49 @@ export interface AnalyzeFloorPlanOptions {
   mediaType: 'image/png' | 'image/jpeg' | 'image/webp'
 }
 
-/** Claude に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
+function describeGeminiError(status: number | undefined, message: string): Error {
+  if (status === 400 || /api key not valid/i.test(message)) {
+    return new Error('APIキーが正しくないようです。Google AI Studio で確認してください。')
+  }
+  if (status === 429) {
+    return new Error('無料枠の利用上限に達しました。しばらく待ってから再試行してください。')
+  }
+  return new Error(`生成に失敗しました: ${message}`)
+}
+
+/** Gemini に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
 export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<FloorPlanResult> {
-  const client = new Anthropic({ apiKey: opts.apiKey, dangerouslyAllowBrowser: true })
-  const response = await client.messages.parse({
-    model: 'claude-opus-5',
-    max_tokens: 8000,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: opts.mediaType, data: opts.imageBase64 } },
-          { type: 'text', text: PROMPT },
-        ],
+  const client = new GoogleGenAI({ apiKey: opts.apiKey })
+  let response
+  try {
+    response = await client.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { data: opts.imageBase64, mimeType: opts.mediaType } },
+            { text: PROMPT },
+          ],
+        },
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseJsonSchema: ZONE_SCHEMA,
       },
-    ],
-    output_config: { format: zodOutputFormat(FloorPlanSchema) },
-  })
-  if (!response.parsed_output) {
+    })
+  } catch (e) {
+    const status = e && typeof e === 'object' && 'status' in e ? Number((e as { status?: unknown }).status) : undefined
+    throw describeGeminiError(status, e instanceof Error ? e.message : String(e))
+  }
+
+  const text = response.text
+  if (!text) {
     throw new Error('画像をうまく読み取れませんでした。もう一度お試しください。')
   }
-  return response.parsed_output
+  try {
+    return JSON.parse(text) as FloorPlanResult
+  } catch {
+    throw new Error('AIの応答を解析できませんでした。もう一度お試しください。')
+  }
 }

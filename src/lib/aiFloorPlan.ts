@@ -2,9 +2,9 @@ import type { Category, Cell, MapNode, NodeKind, Shelf } from '../types'
 import { buildIndex, detectCategory } from './genre'
 import { newId } from './id'
 
-const API_KEY_STORAGE_KEY = 'smart-shopping-list:anthropic-api-key'
+const API_KEY_STORAGE_KEY = 'smart-shopping-list:gemini-api-key'
 
-/** ユーザー自身の Anthropic APIキーを端末内だけに保存する (サーバーには送らない)。 */
+/** ユーザー自身の Google Gemini APIキーを端末内だけに保存する (サーバーには送らない)。 */
 export function getStoredApiKey(): string {
   try {
     return localStorage.getItem(API_KEY_STORAGE_KEY) ?? ''

@@ -63,7 +63,7 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
     if (!file) return
     const key = apiKey.trim()
     if (!key) {
-      setError('Anthropic の APIキーを入力してください。')
+      setError('Google AI の APIキーを入力してください。')
       return
     }
     setStoredApiKey(key)
@@ -88,22 +88,23 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
   return (
     <Sheet open={open} title="見取り図から自動生成" onClose={close}>
       <p className="muted" style={{ marginTop: 0 }}>
-        店内の見取り図を撮影・アップロードすると、AI (Claude) が棚・通路・入口・レジなどを読み取って自動配置します。今のフロアの内容は上書きされます（「元に戻す」で戻せます）。
+        店内の見取り図を撮影・アップロードすると、AI (Google Gemini) が棚・通路・入口・レジなどを読み取って自動配置します。今のフロアの内容は上書きされます（「元に戻す」で戻せます）。無料枠のあるモデルを使うので、通常の利用なら課金なしで試せます。
       </p>
 
       <label className="field">
-        <span>Anthropic APIキー</span>
+        <span>Google AI (Gemini) APIキー</span>
         <input
           type="password"
           value={apiKey}
-          placeholder="sk-ant-..."
+          placeholder="AIza..."
           onChange={(e) => setApiKey(e.target.value)}
           autoComplete="off"
         />
       </label>
       <p className="muted" style={{ marginTop: -6 }}>
-        この端末にのみ保存され、画像とともに Anthropic の API に直接送信されます（アプリの開発者には送信されません）。
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ marginLeft: 4 }}>
+        この端末にのみ保存され、画像とともに Google の API に直接送信されます（アプリの開発者には送信されません）。Google
+        アカウントがあればクレジットカード登録なしで無料取得できます。
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ marginLeft: 4 }}>
           APIキーを取得
         </a>
       </p>
@@ -144,11 +145,5 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
 }
 
 function describeError(e: unknown): string {
-  if (e && typeof e === 'object' && 'status' in e) {
-    const status = (e as { status?: number }).status
-    if (status === 401) return 'APIキーが正しくないようです。Anthropic Consoleで確認してください。'
-    if (status === 429) return 'APIの利用上限に達しました。しばらく待ってから再試行してください。'
-  }
-  const message = e instanceof Error ? e.message : String(e)
-  return `生成に失敗しました: ${message}`
+  return e instanceof Error ? e.message : `生成に失敗しました: ${String(e)}`
 }
