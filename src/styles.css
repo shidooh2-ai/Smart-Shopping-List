@@ -620,30 +620,33 @@ label.field > span {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  padding-top: max(48px, env(safe-area-inset-top, 0px));
+  padding: max(24px, env(safe-area-inset-top, 0px)) 12px max(24px, env(safe-area-inset-bottom, 0px));
   background: rgba(0, 0, 0, 0.42);
   z-index: 60;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
 }
 
 .sheet {
   background: var(--surface);
   width: 100%;
-  max-width: 640px;
-  border-radius: 18px 18px 0 0;
+  max-width: 560px;
+  border-radius: 18px;
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
   animation: sheet-in 0.16s ease-out;
+  /* 画面下端ぴったりに合わせる仕組み (position:fixed の inset や vh) は
+     実機のブラウザUIの状態によって計算がずれ、下端の内容が本文の裏に
+     隠れて操作できなくなることがあった。中央配置なら多少のずれは余白の
+     増減で吸収され、内容が消えることがない。 */
 }
 
 @keyframes sheet-in {
   from {
-    transform: translateY(14px);
-    opacity: 0.6;
+    transform: scale(0.96);
+    opacity: 0;
   }
 }
 
