@@ -115,7 +115,6 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
         />
       </label>
