@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, Type } from '@google/genai'
 import type { FloorPlanResult } from './aiFloorPlan'
 
 /**
@@ -19,23 +19,33 @@ export const GEMINI_MODEL = 'gemini-flash-latest'
 
 const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
 
+/**
+ * Gemini の構造化出力には responseJsonSchema (新しめ) と responseSchema (旧来の
+ * OpenAPIサブセット、Type enum ベース) の2方式があるが、後者の方が対応が古く
+ * 安定しているため、実際に "Request contains an invalid argument" で失敗した
+ * responseJsonSchema 方式から乗り換えた。
+ */
 const ZONE_SCHEMA = {
-  type: 'object',
+  type: Type.OBJECT,
   properties: {
     zones: {
-      type: 'array',
+      type: Type.ARRAY,
       description: '画像から読み取った区画の一覧。重なった場合は配列の後の方が優先される',
-      maxItems: 400,
       items: {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
-          kind: { type: 'string', enum: [...ZONE_KINDS], description: 'この区画の種類' },
-          x0: { type: 'number', minimum: 0, maximum: 1, description: '区画左端のX座標 (画像幅を1とした比率、左端=0)' },
-          y0: { type: 'number', minimum: 0, maximum: 1, description: '区画上端のY座標 (画像高さを1とした比率、上端=0)' },
-          x1: { type: 'number', minimum: 0, maximum: 1, description: '区画右端のX座標' },
-          y1: { type: 'number', minimum: 0, maximum: 1, description: '区画下端のY座標' },
+          kind: {
+            type: Type.STRING,
+            format: 'enum',
+            enum: [...ZONE_KINDS],
+            description: 'この区画の種類',
+          },
+          x0: { type: Type.NUMBER, minimum: 0, maximum: 1, description: '区画左端のX座標 (画像幅を1とした比率、左端=0)' },
+          y0: { type: Type.NUMBER, minimum: 0, maximum: 1, description: '区画上端のY座標 (画像高さを1とした比率、上端=0)' },
+          x1: { type: Type.NUMBER, minimum: 0, maximum: 1, description: '区画右端のX座標' },
+          y1: { type: Type.NUMBER, minimum: 0, maximum: 1, description: '区画下端のY座標' },
           label: {
-            type: 'string',
+            type: Type.STRING,
             description:
               'その区画に書かれている文字・記号があればそのまま書き写す (例: "青果", "レジ", "1番レジ")。無ければ省略。',
           },
@@ -105,7 +115,7 @@ export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<F
       ],
       config: {
         responseMimeType: 'application/json',
-        responseJsonSchema: ZONE_SCHEMA,
+        responseSchema: ZONE_SCHEMA,
       },
     })
   } catch (e) {
