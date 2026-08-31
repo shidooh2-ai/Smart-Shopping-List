@@ -9,8 +9,13 @@ import type { FloorPlanResult } from './aiFloorPlan'
  * 無料枠のある Gemini API を使う (Anthropic Claude には常設の無料枠が無いため)。
  */
 
-/** 無料枠を持つ現行の Gemini Flash モデル。画像入力・JSON構造化出力に対応。 */
-export const GEMINI_MODEL = 'gemini-2.5-flash'
+/**
+ * 無料枠を持つ Gemini Flash モデル。画像入力・JSON構造化出力に対応。
+ * 個別バージョンを固定すると新規ユーザー向け提供終了で 404 になることがあるため
+ * (実際に gemini-2.5-flash で発生)、Google が指す先を自動更新する
+ * floating alias を使う。
+ */
+export const GEMINI_MODEL = 'gemini-flash-latest'
 
 const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
 
@@ -73,6 +78,9 @@ function describeGeminiError(status: number | undefined, message: string): Error
   }
   if (status === 429) {
     return new Error('無料枠の利用上限に達しました。しばらく待ってから再試行してください。')
+  }
+  if (status === 404 || /is not found|no longer available/i.test(message)) {
+    return new Error('AIモデルが利用できなくなっているようです。アプリの更新をお待ちいただくか、開発者にご連絡ください。')
   }
   return new Error(`生成に失敗しました: ${message}`)
 }
