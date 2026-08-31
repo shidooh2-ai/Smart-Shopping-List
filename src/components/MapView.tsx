@@ -28,6 +28,10 @@ export interface MapViewProps {
   /** ドラッグ中のプレビュー色 (塗りつぶし有効時) */
   paintPreviewColor?: string
   height?: number
+  /** 編集の参考として薄く重ねる背景画像 (dataURL) */
+  backgroundImage?: string
+  /** 背景画像の不透明度 0..1 */
+  backgroundOpacity?: number
 }
 
 interface Pointer {
@@ -55,6 +59,8 @@ export function MapView({
   selectedShelfId = null,
   paintPreviewColor = 'var(--accent)',
   height = 320,
+  backgroundImage,
+  backgroundOpacity = 0.35,
 }: MapViewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pointers = useRef(new Map<number, Pointer>())
@@ -302,6 +308,19 @@ export function MapView({
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
           <rect x={0} y={0} width={viewW} height={viewH} fill="var(--surface)" />
 
+          {backgroundImage && (
+            <image
+              href={backgroundImage}
+              x={0}
+              y={0}
+              width={viewW}
+              height={viewH}
+              opacity={backgroundOpacity}
+              preserveAspectRatio="none"
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
           {floor.cells.map((cell, i) => {
             const x = (i % floor.width) * CELL
             const y = Math.floor(i / floor.width) * CELL
@@ -351,7 +370,7 @@ export function MapView({
                 y={y}
                 width={CELL}
                 height={CELL}
-                fill="var(--surface)"
+                fill={backgroundImage ? 'none' : 'var(--surface)'}
                 stroke="var(--border)"
                 strokeWidth={0.4}
               />

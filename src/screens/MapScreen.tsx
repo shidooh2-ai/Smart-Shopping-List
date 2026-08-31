@@ -219,7 +219,35 @@ export function MapScreen() {
           onTapCell={tool === 'select' ? handleTapCell : undefined}
           selectedShelfId={tool === 'shelf' ? shelfId : null}
           height={420}
+          backgroundImage={floor.backgroundImage}
+          backgroundOpacity={floor.backgroundOpacity ?? 0.35}
         />
+
+        {floor.backgroundImage && (
+          <div className="row" style={{ marginTop: 10 }}>
+            <span className="muted">背景画像の透明度</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round((floor.backgroundOpacity ?? 0.35) * 100)}
+              onChange={(e) =>
+                updateFloor(store.id, floor.id, { backgroundOpacity: Number(e.target.value) / 100 })
+              }
+              style={{ flex: 1 }}
+            />
+            <span className="muted" style={{ minWidth: 36, textAlign: 'right' }}>
+              {Math.round((floor.backgroundOpacity ?? 0.35) * 100)}%
+            </span>
+            <button
+              type="button"
+              className="btn slim"
+              onClick={() => updateFloor(store.id, floor.id, { backgroundImage: null })}
+            >
+              背景を削除
+            </button>
+          </div>
+        )}
 
         <p className="muted" style={{ margin: '8px 0 0' }}>
           {hintFor(tool)}

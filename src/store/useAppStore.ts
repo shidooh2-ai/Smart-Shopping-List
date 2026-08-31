@@ -72,7 +72,11 @@ export interface AppState {
   renameStore: (storeId: string, name: string) => void
   setCellMeters: (storeId: string, meters: number) => void
   addFloor: (storeId: string) => string
-  updateFloor: (storeId: string, floorId: string, patch: { name?: string; level?: number }) => void
+  updateFloor: (
+    storeId: string,
+    floorId: string,
+    patch: { name?: string; level?: number; backgroundImage?: string | null; backgroundOpacity?: number },
+  ) => void
   resizeFloor: (storeId: string, floorId: string, width: number, height: number) => void
   deleteFloor: (storeId: string, floorId: string) => void
   createShelf: (storeId: string, floorId: string, name?: string) => string
@@ -87,7 +91,14 @@ export interface AppState {
   importFloorLayout: (
     storeId: string,
     floorId: string,
-    layout: { width: number; height: number; cells: Cell[]; shelves: Shelf[]; nodes: MapNode[] },
+    layout: {
+      width: number
+      height: number
+      cells: Cell[]
+      shelves: Shelf[]
+      nodes: MapNode[]
+      backgroundImage?: string
+    },
   ) => void
   /** 直前の paint / importFloorLayout 操作を1回取り消す */
   undoMap: (storeId: string) => void
@@ -367,7 +378,16 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           stores: mapStore(s.stores, storeId, (st) => ({
             ...st,
-            floors: st.floors.map((f) => (f.id === floorId ? { ...f, ...patch } : f)),
+            floors: st.floors.map((f) => {
+              if (f.id !== floorId) return f
+              // backgroundImage: null は「削除」、未指定 (undefined) は「変更しない」の意味
+              const { backgroundImage, ...rest } = patch
+              return {
+                ...f,
+                ...rest,
+                backgroundImage: backgroundImage === null ? undefined : (backgroundImage ?? f.backgroundImage),
+              }
+            }),
           })),
         })),
 
@@ -510,7 +530,16 @@ export const useAppStore = create<AppState>()(
               const floor = st.floors.find((f) => f.id === floorId)
               if (!floor) return st
               const floors = st.floors.map((f) =>
-                f.id === floorId ? { ...f, width: layout.width, height: layout.height, cells: layout.cells } : f,
+                f.id === floorId
+                  ? {
+                      ...f,
+                      width: layout.width,
+                      height: layout.height,
+                      cells: layout.cells,
+                      backgroundImage: layout.backgroundImage ?? f.backgroundImage,
+                      backgroundOpacity: f.backgroundOpacity ?? 0.35,
+                    }
+                  : f,
               )
               const shelves = [...st.shelves.filter((sh) => sh.floorId !== floorId), ...layout.shelves]
               const nodes = [...st.nodes.filter((n) => n.floorId !== floorId), ...layout.nodes]

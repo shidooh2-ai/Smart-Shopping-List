@@ -15,6 +15,10 @@ export interface Floor {
   height: number
   /** row-major、長さ = width * height */
   cells: Cell[]
+  /** 編集の参考として薄く重ねて表示する背景画像 (dataURL)。見取り図からの自動生成時に設定される */
+  backgroundImage?: string
+  /** 背景画像の不透明度 (0=透明〜1=不透明)。既定 0.35 */
+  backgroundOpacity?: number
 }
 
 export interface Shelf {

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   fileToAnalyzableImage,
+  fileToBackgroundImage,
   getStoredApiKey,
   pickGridSize,
   rasterizeFloorPlan,
@@ -15,6 +16,8 @@ export interface FloorPlanGenerateResult {
   cells: ReturnType<typeof rasterizeFloorPlan>['cells']
   shelves: ReturnType<typeof rasterizeFloorPlan>['shelves']
   nodes: ReturnType<typeof rasterizeFloorPlan>['nodes']
+  /** 編集時の参考として重ねて表示できる、元の見取り図画像 (dataURL) */
+  backgroundImage: string
 }
 
 export interface AiFloorPlanSheetProps {
@@ -70,14 +73,15 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
     setStatus('analyzing')
     setError(null)
     try {
-      const [{ analyzeFloorPlan }, image] = await Promise.all([
+      const [{ analyzeFloorPlan }, image, backgroundImage] = await Promise.all([
         import('../lib/aiFloorPlanClient'),
         fileToAnalyzableImage(file),
+        fileToBackgroundImage(file),
       ])
       const result = await analyzeFloorPlan({ apiKey: key, imageBase64: image.base64, mediaType: image.mediaType })
       const grid = pickGridSize(image.width, image.height)
       const layout = rasterizeFloorPlan(result, grid.width, grid.height, floorId, categories)
-      onGenerated(layout)
+      onGenerated({ ...layout, backgroundImage })
       close()
     } catch (e) {
       setStatus('error')
