@@ -73,7 +73,7 @@ export interface AnalyzeFloorPlanOptions {
 }
 
 function describeGeminiError(status: number | undefined, message: string): Error {
-  if (status === 400 || /api key not valid/i.test(message)) {
+  if (status === 401 || status === 403 || /api key not valid|api_key_invalid/i.test(message)) {
     return new Error('APIキーが正しくないようです。Google AI Studio で確認してください。')
   }
   if (status === 429) {
@@ -82,7 +82,9 @@ function describeGeminiError(status: number | undefined, message: string): Error
   if (status === 404 || /is not found|no longer available/i.test(message)) {
     return new Error('AIモデルが利用できなくなっているようです。アプリの更新をお待ちいただくか、開発者にご連絡ください。')
   }
-  return new Error(`生成に失敗しました: ${message}`)
+  // 400 はキー以外の原因 (リクエスト内容の問題など) のこともあるため、
+  // 実際のエラー内容をそのまま出す (原因の特定・報告に必要)。
+  return new Error(`生成に失敗しました (${status ?? '?'}): ${message}`)
 }
 
 /** Gemini に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
