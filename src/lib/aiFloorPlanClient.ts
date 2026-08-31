@@ -92,35 +92,56 @@ function describeGeminiError(status: number | undefined, message: string): Error
   if (status === 404 || /is not found|no longer available/i.test(message)) {
     return new Error('AIモデルが利用できなくなっているようです。アプリの更新をお待ちいただくか、開発者にご連絡ください。')
   }
+  if (status === 503 || /unavailable|overloaded|high demand/i.test(message)) {
+    return new Error('Geminiサーバーが混み合っているようです。少し時間をおいてからもう一度お試しください。')
+  }
   // 400 はキー以外の原因 (リクエスト内容の問題など) のこともあるため、
   // 実際のエラー内容をそのまま出す (原因の特定・報告に必要)。
   return new Error(`生成に失敗しました (${status ?? '?'}): ${message}`)
 }
 
+function statusOf(e: unknown): number | undefined {
+  return e && typeof e === 'object' && 'status' in e ? Number((e as { status?: unknown }).status) : undefined
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// 無料枠のFlashモデルは混雑時に一時的な503を返しやすいため、短い間隔で数回だけ自動再試行する。
+const RETRY_DELAYS_MS = [1500, 3000]
+
 /** Gemini に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
 export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<FloorPlanResult> {
   const client = new GoogleGenAI({ apiKey: opts.apiKey })
   let response
-  try {
-    response = await client.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { data: opts.imageBase64, mimeType: opts.mediaType } },
-            { text: PROMPT },
-          ],
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await client.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { data: opts.imageBase64, mimeType: opts.mediaType } },
+              { text: PROMPT },
+            ],
+          },
+        ],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: ZONE_SCHEMA,
         },
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: ZONE_SCHEMA,
-      },
-    })
-  } catch (e) {
-    const status = e && typeof e === 'object' && 'status' in e ? Number((e as { status?: unknown }).status) : undefined
-    throw describeGeminiError(status, e instanceof Error ? e.message : String(e))
+      })
+      break
+    } catch (e) {
+      const status = statusOf(e)
+      const message = e instanceof Error ? e.message : String(e)
+      const retryable = status === 503 || /unavailable|overloaded/i.test(message)
+      if (retryable && attempt < RETRY_DELAYS_MS.length) {
+        await sleep(RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      throw describeGeminiError(status, message)
+    }
   }
 
   const text = response.text
