@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai'
+import type { GenerateContentResponse } from '@google/genai'
 import type { FloorPlanResult } from './aiFloorPlan'
 
 /**
@@ -14,8 +15,12 @@ import type { FloorPlanResult } from './aiFloorPlan'
  * 個別バージョンを固定すると新規ユーザー向け提供終了で 404 になることがあるため
  * (実際に gemini-2.5-flash で発生)、Google が指す先を自動更新する
  * floating alias を使う。
+ *
+ * 最新の flash モデルは公開直後で混雑しやすく 503 (高負荷) が続くことがあるため、
+ * より軽量で空いていることが多い flash-lite を先に試し、それでも503が続く場合だけ
+ * 通常の flash にフォールバックする (analyzeFloorPlan 参照)。
  */
-export const GEMINI_MODEL = 'gemini-flash-latest'
+export const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest'] as const
 
 const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
 
@@ -93,7 +98,9 @@ function describeGeminiError(status: number | undefined, message: string): Error
     return new Error('AIモデルが利用できなくなっているようです。アプリの更新をお待ちいただくか、開発者にご連絡ください。')
   }
   if (status === 503 || /unavailable|overloaded|high demand/i.test(message)) {
-    return new Error('Geminiサーバーが混み合っているようです。少し時間をおいてからもう一度お試しください。')
+    return new Error(
+      'Geminiサーバーが混み合っているようです。無料枠のモデルはGoogle側の負荷が高い時間帯があり、公開直後のモデルでは数時間〜1日程度続くこともあります。時間をおいて再試行してください。',
+    )
   }
   // 400 はキー以外の原因 (リクエスト内容の問題など) のこともあるため、
   // 実際のエラー内容をそのまま出す (原因の特定・報告に必要)。
@@ -106,17 +113,23 @@ function statusOf(e: unknown): number | undefined {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-// 無料枠のFlashモデルは混雑時に一時的な503を返しやすいため、短い間隔で数回だけ自動再試行する。
+// 無料枠のFlashモデルは混雑時に一時的な503を返しやすいため、モデルごとに短い間隔で数回だけ自動再試行する。
 const RETRY_DELAYS_MS = [1500, 3000]
 
-/** Gemini に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
-export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<FloorPlanResult> {
-  const client = new GoogleGenAI({ apiKey: opts.apiKey })
-  let response
+type ModelAttemptResult =
+  | { ok: true; response: GenerateContentResponse }
+  | { ok: false; status: number | undefined; message: string }
+
+/** 1つのモデルに対して、再試行しても良い間 (503など) は自動で試す。それ以外の失敗は即座にthrowする。 */
+async function generateWithModel(
+  client: GoogleGenAI,
+  model: string,
+  opts: AnalyzeFloorPlanOptions,
+): Promise<ModelAttemptResult> {
   for (let attempt = 0; ; attempt++) {
     try {
-      response = await client.models.generateContent({
-        model: GEMINI_MODEL,
+      const response = await client.models.generateContent({
+        model,
         contents: [
           {
             role: 'user',
@@ -131,17 +144,37 @@ export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<F
           responseSchema: ZONE_SCHEMA,
         },
       })
-      break
+      return { ok: true, response }
     } catch (e) {
       const status = statusOf(e)
       const message = e instanceof Error ? e.message : String(e)
       const retryable = status === 503 || /unavailable|overloaded/i.test(message)
-      if (retryable && attempt < RETRY_DELAYS_MS.length) {
+      if (!retryable) throw describeGeminiError(status, message)
+      if (attempt < RETRY_DELAYS_MS.length) {
         await sleep(RETRY_DELAYS_MS[attempt])
         continue
       }
-      throw describeGeminiError(status, message)
+      return { ok: false, status, message }
     }
+  }
+}
+
+/** Gemini に見取り図画像を渡し、区画一覧を構造化データとして受け取る。 */
+export async function analyzeFloorPlan(opts: AnalyzeFloorPlanOptions): Promise<FloorPlanResult> {
+  const client = new GoogleGenAI({ apiKey: opts.apiKey })
+  let response: GenerateContentResponse | null = null
+  let lastFailure: { status: number | undefined; message: string } | null = null
+  // 1つのモデルが混雑していても別のモデルは空いていることがあるため、順番に試す。
+  for (const model of GEMINI_MODELS) {
+    const result = await generateWithModel(client, model, opts)
+    if (result.ok) {
+      response = result.response
+      break
+    }
+    lastFailure = result
+  }
+  if (!response) {
+    throw describeGeminiError(lastFailure?.status, lastFailure?.message ?? '不明なエラー')
   }
 
   const text = response.text
