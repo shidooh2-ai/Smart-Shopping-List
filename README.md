@@ -80,6 +80,23 @@ Node.js 18 以上が必要です。
 `npm run dev -- --host` で起動し、同じ Wi-Fi のスマホから表示された URL を開きます。
 本番ビルド（`dist/`）は静的ファイルなので、任意の HTTPS ホスティングに置けます。設置後、ブラウザのメニューから「ホーム画面に追加」でインストールできます。
 
+### iPhoneアプリ (App Store 提出用)
+
+[Capacitor](https://capacitorjs.com/) で `ios/` 以下にネイティブの Xcode プロジェクトを用意しています。Web版と同じソース（`src/`）から作られるので、機能追加は普段どおり `src/` を変更するだけで両方に反映されます。
+
+**ここから先は macOS + Xcode が必須です**（このリポジトリの開発環境では実行できません）。
+
+1. Mac に [Xcode](https://apps.apple.com/app/xcode/id497799835) をインストールし、[Apple Developer Program](https://developer.apple.com/programs/)（年会費 $99）に登録します
+2. このリポジトリを Mac に clone し、`npm install` を実行します
+3. `npm run ios:open` — Web版をビルドして `ios/` に反映し、Xcode で `ios/App/App.xcworkspace` を開きます（CocoaPods は不要。Swift Package Manager で依存解決されます）
+4. Xcode の "Signing & Capabilities" タブで、自分の Apple Developer チームを選択します
+   - Bundle Identifier（既定値 `com.kaimonoroute.app`、`capacitor.config.ts` の `appId`）を、自分が App Store Connect で登録する値に変更してください
+5. 実機・シミュレーターで動作確認（▶ ボタン）
+6. Product → Archive でアーカイブを作成し、Organizer から App Store Connect にアップロードします
+7. [App Store Connect](https://appstoreconnect.apple.com/) 側でアプリを新規作成し、スクリーンショット・説明文・プライバシーポリシーURL などを入力して審査に提出します（見取り図の画像は端末内から選択し Google のAPIへ直接送信するのみで自社サーバーは経由しない、という点をプライバシー情報の記載に反映してください）
+
+コードを変更したら、Xcode で開き直す前に `npm run ios:sync`（ビルド + `dist/` の反映）を実行してください。アプリアイコン (`ios/App/App/Assets.xcassets/AppIcon.appiconset`) とスプラッシュ画面 (`Splash.imageset`) は PWA 用アイコンから自動生成した仮のものなので、必要に応じて差し替えてください。
+
 ### テスト
 
 `npm test` で70件の単体テストが走ります。
@@ -121,6 +138,8 @@ src/
   store/useAppStore.ts   アプリ状態（zustand + localStorage 永続化）
   components/            地図描画・ボトムシート・ジャンル選択
   screens/               リスト / ルート / マップ / ジャンル の4画面
+capacitor.config.ts       iPhoneアプリ (Capacitor) の設定
+ios/                      Xcode プロジェクト (iPhoneアプリ、要 macOS)
 ```
 
 ## データの保存とバックアップ

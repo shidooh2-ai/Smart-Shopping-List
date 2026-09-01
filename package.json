@@ -10,15 +10,20 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false"
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npm run ios:sync && npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
     "@google/genai": "^2.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
