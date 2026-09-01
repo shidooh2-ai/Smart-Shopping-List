@@ -311,6 +311,7 @@ export function MapView({
           {backgroundImage && (
             <image
               href={backgroundImage}
+              xlinkHref={backgroundImage}
               x={0}
               y={0}
               width={viewW}
