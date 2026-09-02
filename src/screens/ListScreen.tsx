@@ -301,12 +301,12 @@ function ItemRow({ item, category, onToggle, onRename, onRemove, onPickCategory 
 
   return (
     <li className={`item${item.checked ? ' done' : ''}`}>
-      <input
-        className="check"
-        type="checkbox"
-        checked={item.checked}
-        onChange={onToggle}
-        aria-label={`${item.text} を購入済みにする`}
+      <button
+        type="button"
+        className="swatch"
+        style={{ background: category?.color ?? 'var(--outline)' }}
+        onClick={onPickCategory}
+        aria-label={category ? `ジャンル: ${category.name}` : 'ジャンルを選ぶ'}
       />
       <div className="body">
         <input
@@ -323,20 +323,19 @@ function ItemRow({ item, category, onToggle, onRename, onRemove, onPickCategory 
         <button
           type="button"
           className={`chip${category ? '' : ' unknown'}${uncertain ? ' guess' : ''}`}
-          style={category ? undefined : undefined}
           onClick={onPickCategory}
           title={uncertain ? '自動判定の確信度が低めです' : undefined}
         >
-          {category ? (
-            <>
-              <span className="dot" style={{ background: category.color }} />
-              {category.name}
-            </>
-          ) : (
-            'ジャンル未設定'
-          )}
+          {category ? category.name : 'ジャンル未設定'}
         </button>
       </div>
+      <input
+        className="check"
+        type="checkbox"
+        checked={item.checked}
+        onChange={onToggle}
+        aria-label={`${item.text} を購入済みにする`}
+      />
       <button type="button" className="remove" onClick={onRemove} aria-label={`${item.text} を削除`}>
         ×
       </button>

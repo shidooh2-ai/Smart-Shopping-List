@@ -49,7 +49,7 @@ export function RouteScreen() {
   return (
     <div className="screen">
       {plan && plan.stops.length > 0 && metrics && (
-        <div className="card">
+        <div className="card metrics-card">
           <div className="metrics">
             <div>
               <strong>{plan.stops.length}</strong>
@@ -127,7 +127,7 @@ export function RouteScreen() {
             />
             <div className="legend">
               <span>
-                <i style={{ background: '#2e7d32', borderRadius: '50%' }} />
+                <i style={{ background: 'var(--accent)', borderRadius: '50%' }} />
                 入口
               </span>
               <span>
@@ -135,13 +135,13 @@ export function RouteScreen() {
                 レジ
               </span>
               <span>
-                <i style={{ background: 'var(--accent)', borderRadius: '50%' }} />
+                <i style={{ background: 'var(--coral)', borderRadius: '50%' }} />
                 立ち寄り順
               </span>
             </div>
           </div>
 
-          <div className="card">
+          <div className="card stops-card">
             <h2>買い回りの順番</h2>
             {plan.stops.map((stop) => {
               const items = stop.itemIds.map((id) => itemById.get(id)).filter(Boolean)

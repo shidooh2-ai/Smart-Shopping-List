@@ -470,7 +470,7 @@ export function MapView({
                 cx={(s.pos.x + 0.5) * CELL}
                 cy={(s.pos.y + 0.5) * CELL}
                 r={CELL * (activeStop === s.order ? 0.52 : 0.42)}
-                fill={activeStop === s.order ? '#111' : 'var(--accent)'}
+                fill={activeStop === s.order ? '#111' : 'var(--coral)'}
                 stroke="#fff"
                 strokeWidth={1.6}
               />

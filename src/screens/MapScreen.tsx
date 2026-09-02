@@ -384,7 +384,7 @@ export function MapScreen() {
                           .join('、')}
                   </span>
                 </span>
-                <button type="button" className="btn slim" onClick={() => setShelfSheet(s.id)}>
+                <button type="button" className="btn slim accent" onClick={() => setShelfSheet(s.id)}>
                   編集
                 </button>
               </li>

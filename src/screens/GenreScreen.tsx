@@ -114,13 +114,13 @@ export function GenreScreen() {
           {categories.map((c) => (
             <li key={c.id}>
               <span
-                style={{ width: 14, height: 14, borderRadius: '50%', background: c.color, flex: 'none' }}
+                style={{ width: 30, height: 30, borderRadius: '50%', background: c.color, flex: 'none' }}
               />
               <span className="grow">
                 <span className="title">{c.name}</span>
                 <span className="muted">語彙 {c.keywords.length} 語</span>
               </span>
-              <button type="button" className="btn slim" onClick={() => setEditing(c.id)}>
+              <button type="button" className="btn slim accent" onClick={() => setEditing(c.id)}>
                 編集
               </button>
             </li>
