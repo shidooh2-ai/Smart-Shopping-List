@@ -91,11 +91,24 @@ Node.js 18 以上が必要です。
 3. `npm run ios:open` — Web版をビルドして `ios/` に反映し、Xcode で `ios/App/App.xcworkspace` を開きます（CocoaPods は不要。Swift Package Manager で依存解決されます）
 4. Xcode の "Signing & Capabilities" タブで、自分の Apple Developer チームを選択します
    - Bundle Identifier（既定値 `com.kaimonoroute.app`、`capacitor.config.ts` の `appId`）を、自分が App Store Connect で登録する値に変更してください
+   - 「＋ Capability」→「iCloud」を追加し、「CloudKit」にチェックを入れます（店舗マップ・買い物リストの共有機能に必要。下記「iCloudでの共有」参照）。コンテナは自動生成されるものをそのまま使えます
 5. 実機・シミュレーターで動作確認（▶ ボタン）
 6. Product → Archive でアーカイブを作成し、Organizer から App Store Connect にアップロードします
-7. [App Store Connect](https://appstoreconnect.apple.com/) 側でアプリを新規作成し、スクリーンショット・説明文・プライバシーポリシーURL などを入力して審査に提出します（見取り図の画像は端末内から選択し Google のAPIへ直接送信するのみで自社サーバーは経由しない、という点をプライバシー情報の記載に反映してください）
+7. [App Store Connect](https://appstoreconnect.apple.com/) 側でアプリを新規作成し、スクリーンショット・説明文・プライバシーポリシーURL などを入力して審査に提出します（見取り図の画像は端末内から選択し Google のAPIへ直接送信するのみで自社サーバーは経由しない、iCloud共有機能はAppleのCloudKitを使い開発者側のサーバーは経由しない、という点をプライバシー情報の記載に反映してください）
 
 コードを変更したら、Xcode で開き直す前に `npm run ios:sync`（ビルド + `dist/` の反映）を実行してください。アプリアイコン (`ios/App/App/Assets.xcassets/AppIcon.appiconset`) とスプラッシュ画面 (`Splash.imageset`) は PWA 用アイコンから自動生成した仮のものなので、必要に応じて差し替えてください。
+
+#### iCloudでの共有
+
+店舗マップ・買い物リストは、家族や友人と iCloud (CloudKit) 経由で共有できます。サーバーは持たず、Apple の CloudKit を無料枠の範囲で使います。
+
+- マップ画面の「店舗設定」、リスト画面の「リスト管理」に「iCloudで共有」の項目があります。「家族・友人と共有する」を押すと標準の共有シート（メッセージ・メールなど）が開くので、招待したい相手を選びます
+- 相手が招待リンクを開くと、そのマップ／リストが相手の端末にも追加されます
+- 同期はリアルタイムではなく、**アプリを起動 (フォアグラウンドに戻す) するたびに最新の内容を取得**し、自分の変更は少し待ってから送信する方式です。同時に編集した場合は更新日時が新しい方が優先されます（簡易な最終更新優先のマージで、細かい競合解決はしません）
+- 共有元（オーナー）は「共有を停止」でいつでも共有を打ち切れます。招待された側は「共有から離れる」で自分だけ抜けられます
+- 実装はネイティブプラグイン `ios/App/App/CloudSyncPlugin.swift`（Swift/CloudKit）と `src/lib/cloudSync.ts` / `src/lib/cloudSyncBridge.ts`（TypeScript側）に分かれています。Web版では常に無効（何も表示されません）
+
+**重要: 本番 (Production) 環境へのスキーマ配信を忘れずに。** CloudKitはレコードの型（`SharedStore`/`SharedList`）を、開発 (Development) 環境では初回保存時に自動生成しますが、この自動生成は Development 環境限定です。App Store 用の本番ビルドでは、[CloudKit Dashboard](https://icloud.developer.apple.com/dashboard/) を開き、対象コンテナ（`capacitor.config.ts` の設定や Xcode の Signing & Capabilities で確認できます）の Development 環境で一度 Xcode から実機テストして2つのレコード型を作成させたあと、「Deploy Schema Changes to Production」でスキーマを本番に反映してください。これを忘れると、TestFlight や App Store 版で共有が無言で失敗します（開発中の Debug ビルドでは問題なく動きます）。
 
 ### テスト
 
@@ -132,6 +145,8 @@ src/
     route.ts             集合TSP によるルート作成
     layout.ts            ASCII アートからマップを組み立てる
     mapStyle.ts          地図の配色
+    cloudSync.ts         iCloud共有ネイティブプラグインのラッパー (iPhoneアプリのみ)
+    cloudSyncBridge.ts   起動時の取得・変更時の自動送信の配線
   data/
     categories.ts        既定の23ジャンルと語彙辞書
     sampleStore.ts       サンプル店舗（2階建て）
@@ -140,6 +155,7 @@ src/
   screens/               リスト / ルート / マップ / ジャンル の4画面
 capacitor.config.ts       iPhoneアプリ (Capacitor) の設定
 ios/                      Xcode プロジェクト (iPhoneアプリ、要 macOS)
+  App/App/CloudSyncPlugin.swift   iCloud共有のネイティブ実装 (CloudKit)
 ```
 
 ## データの保存とバックアップ

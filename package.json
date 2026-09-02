@@ -15,6 +15,7 @@
     "ios:open": "npm run ios:sync && npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.1",
     "@capacitor/ios": "^8.5.1",
     "@google/genai": "^2.19.0",

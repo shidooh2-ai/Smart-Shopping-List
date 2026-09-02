@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { CloudSync, type CloudSyncItem } from '../lib/cloudSync'
 import { cloneDefaultCategories } from '../data/categories'
 import { createSampleStore } from '../data/sampleStore'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
@@ -9,6 +10,7 @@ import { splitItems } from '../lib/normalize'
 import type {
   Category,
   Cell,
+  CloudLink,
   Floor,
   MapNode,
   NodeKind,
@@ -105,6 +107,23 @@ export interface AppState {
   cleanupMap: (storeId: string) => void
 
   replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases'>>) => void
+
+  // --- iCloud共有 (iPhoneアプリのみ) ---
+  /** 店舗マップをiCloud経由で共有する (標準の共有シートが開く) */
+  shareStore: (storeId: string) => Promise<void>
+  /** 店舗マップの共有を停止する */
+  unshareStore: (storeId: string) => Promise<void>
+  /** 買い物リストをiCloud経由で共有する (標準の共有シートが開く) */
+  shareList: (listId: string) => Promise<void>
+  /** 買い物リストの共有を停止する */
+  unshareList: (listId: string) => Promise<void>
+  /**
+   * 自分が共有したもの・共有されたものの最新状態を取得し、ローカルに反映する。
+   * updatedAt を比較し、新しい方を採用する (簡易な最終更新優先のマージ)。
+   */
+  pullCloudShares: () => Promise<void>
+  /** ローカルでの変更のうち、まだCloudKitへ送っていないものを送信する */
+  pushCloudChanges: () => Promise<void>
 }
 
 function createInitialList(storeId: string | null): ShoppingList {
@@ -137,6 +156,82 @@ function mapList(
 
 function mapStore(stores: StoreMap[], storeId: string, fn: (s: StoreMap) => StoreMap): StoreMap[] {
   return stores.map((s) => (s.id === storeId ? { ...fn(s), updatedAt: Date.now() } : s))
+}
+
+/**
+ * cloud のリンク情報だけを書き換える (updatedAt は変えない — cloudのリンク付け自体は
+ * 「内容の編集」ではないため。ここでupdatedAtを更新すると、共有→即再送信のループになる)。
+ * patch が undefined なら共有を解除する。
+ */
+function patchCloud<T extends { id: string; cloud?: CloudLink }>(
+  list: T[],
+  id: string,
+  patch: CloudLink | Partial<CloudLink> | undefined,
+): T[] {
+  return list.map((item) => {
+    if (item.id !== id) return item
+    if (patch === undefined) {
+      const { cloud: _drop, ...rest } = item
+      return rest as T
+    }
+    return { ...item, cloud: { ...item.cloud, ...patch } as CloudLink }
+  })
+}
+
+/** CloudKitへ送信するJSONには自分の cloud リンク情報 (recordIdなど) を含めない。 */
+function stripCloud<T extends { cloud?: CloudLink }>(entity: T): T {
+  const { cloud: _drop, ...rest } = entity
+  return rest as T
+}
+
+/**
+ * pull() で取得した1件を、自分の共有相手一覧 (list) にマージする。
+ * 既に紐付いている項目があれば updatedAt が新しい方を採用し、無ければ新規に取り込む。
+ * ローカルの方が新しい場合は内容はそのまま (pushCloudChanges が後で送信する)。
+ */
+function mergeCloudEntity<T extends { id: string; updatedAt: number; cloud?: CloudLink }>(
+  list: T[],
+  item: CloudSyncItem,
+  parse: (json: string) => T,
+): T[] {
+  const cloudFromRemote: CloudLink = {
+    recordId: item.recordId,
+    owner: item.owner,
+    lastPushedUpdatedAt: item.updatedAt,
+    zoneOwnerName: item.zoneOwnerName,
+  }
+  const existingIndex = list.findIndex((e) => e.cloud?.recordId === item.recordId)
+  if (existingIndex === -1) {
+    return [...list, { ...stripCloud(parse(item.json)), cloud: cloudFromRemote }]
+  }
+  const existing = list[existingIndex]
+  const next = [...list]
+  if (item.updatedAt > existing.updatedAt) {
+    next[existingIndex] = { ...stripCloud(parse(item.json)), cloud: cloudFromRemote }
+  } else {
+    next[existingIndex] = {
+      ...existing,
+      cloud: { ...existing.cloud, recordId: item.recordId, owner: item.owner, zoneOwnerName: item.zoneOwnerName } as CloudLink,
+    }
+  }
+  return next
+}
+
+/** ローカルの変更をCloudKitへ送信する。オフライン等で失敗したら false を返し、次回また試す。 */
+async function pushCloudEntity<T extends { cloud?: CloudLink; updatedAt: number }>(entity: T): Promise<boolean> {
+  if (!entity.cloud) return false
+  try {
+    await CloudSync.push({
+      recordId: entity.cloud.recordId,
+      json: JSON.stringify(stripCloud(entity)),
+      updatedAt: entity.updatedAt,
+      owner: entity.cloud.owner,
+      zoneOwnerName: entity.cloud.zoneOwnerName,
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 export const useAppStore = create<AppState>()(
@@ -573,6 +668,91 @@ export const useAppStore = create<AppState>()(
             activeListId: lists.some((l) => l.id === s.activeListId) ? s.activeListId : (lists[0]?.id ?? null),
           }
         }),
+
+      // --- iCloud共有 ---
+      shareStore: async (storeId) => {
+        const store = get().stores.find((st) => st.id === storeId)
+        if (!store) return
+        const { recordId } = await CloudSync.share({
+          kind: 'store',
+          localId: store.id,
+          name: store.name,
+          json: JSON.stringify(stripCloud(store)),
+          updatedAt: store.updatedAt,
+        })
+        set((s) => ({
+          stores: patchCloud(s.stores, storeId, { recordId, owner: true, lastPushedUpdatedAt: store.updatedAt }),
+        }))
+      },
+
+      unshareStore: async (storeId) => {
+        const store = get().stores.find((st) => st.id === storeId)
+        if (!store?.cloud) return
+        await CloudSync.unshare({
+          recordId: store.cloud.recordId,
+          owner: store.cloud.owner,
+          zoneOwnerName: store.cloud.zoneOwnerName,
+        })
+        set((s) => ({ stores: patchCloud(s.stores, storeId, undefined) }))
+      },
+
+      shareList: async (listId) => {
+        const list = get().lists.find((l) => l.id === listId)
+        if (!list) return
+        const { recordId } = await CloudSync.share({
+          kind: 'list',
+          localId: list.id,
+          name: list.name,
+          json: JSON.stringify(stripCloud(list)),
+          updatedAt: list.updatedAt,
+        })
+        set((s) => ({
+          lists: patchCloud(s.lists, listId, { recordId, owner: true, lastPushedUpdatedAt: list.updatedAt }),
+        }))
+      },
+
+      unshareList: async (listId) => {
+        const list = get().lists.find((l) => l.id === listId)
+        if (!list?.cloud) return
+        await CloudSync.unshare({
+          recordId: list.cloud.recordId,
+          owner: list.cloud.owner,
+          zoneOwnerName: list.cloud.zoneOwnerName,
+        })
+        set((s) => ({ lists: patchCloud(s.lists, listId, undefined) }))
+      },
+
+      pullCloudShares: async () => {
+        const { items } = await CloudSync.pull()
+        set((s) => {
+          let stores = s.stores
+          let lists = s.lists
+          for (const item of items) {
+            if (item.kind === 'store') {
+              stores = mergeCloudEntity(stores, item, (json) => JSON.parse(json) as StoreMap)
+            } else {
+              lists = mergeCloudEntity(lists, item, (json) => JSON.parse(json) as ShoppingList)
+            }
+          }
+          return { stores, lists }
+        })
+      },
+
+      pushCloudChanges: async () => {
+        const { stores, lists } = get()
+        for (const store of stores) {
+          if (store.cloud && store.updatedAt > store.cloud.lastPushedUpdatedAt) {
+            const ok = await pushCloudEntity(store)
+            if (ok) set((s) => ({ stores: patchCloud(s.stores, store.id, { lastPushedUpdatedAt: store.updatedAt }) }))
+          }
+        }
+        for (const list of lists) {
+          if (list.cloud && list.updatedAt > list.cloud.lastPushedUpdatedAt) {
+            const ok = await pushCloudEntity(list)
+            if (ok) set((s) => ({ lists: patchCloud(s.lists, list.id, { lastPushedUpdatedAt: list.updatedAt }) }))
+          }
+        }
+      },
     }),
     {
       name: 'smart-shopping-list',

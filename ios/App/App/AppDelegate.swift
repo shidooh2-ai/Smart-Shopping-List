@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import CloudKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -40,5 +41,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+
+    /// 他の人からiCloud共有 (店舗マップ・買い物リスト) の招待リンクを開いたときに呼ばれる。
+    func application(_ application: UIApplication, userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata) {
+        let container = CKContainer(identifier: cloudKitShareMetadata.containerIdentifier)
+        let op = CKAcceptSharesOperation(shareMetadatas: [cloudKitShareMetadata])
+        op.perShareResultBlock = { _, result in
+            if case .failure(let error) = result {
+                CAPLog.print("CloudKit share accept failed: \(error.localizedDescription)")
+            }
+        }
+        op.acceptSharesResultBlock = { _ in
+            NotificationCenter.default.post(name: .cloudKitShareAccepted, object: nil)
+        }
+        container.add(op)
     }
 }

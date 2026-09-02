@@ -50,6 +50,8 @@ export interface StoreMap {
   cellMeters: number
   createdAt: number
   updatedAt: number
+  /** iCloud (CloudKit) 経由で共有中の場合の情報 */
+  cloud?: CloudLink
 }
 
 export interface Category {
@@ -80,6 +82,20 @@ export interface ShoppingList {
   items: ShoppingItem[]
   createdAt: number
   updatedAt: number
+  /** iCloud (CloudKit) 経由で共有中の場合の情報 */
+  cloud?: CloudLink
+}
+
+/** iCloud (CloudKit) 共有への紐付け情報。iPhoneアプリ (Capacitor) でのみ使う */
+export interface CloudLink {
+  /** CloudKitのレコード名 (recordName) */
+  recordId: string
+  /** この端末がオーナー (共有を開始した側) かどうか。オーナーのみ共有停止できる */
+  owner: boolean
+  /** 最後にCloudKitへ反映した内容のupdatedAt。これより新しいローカル変更だけを送信する */
+  lastPushedUpdatedAt: number
+  /** CloudKitのゾーン所有者ID。共有された側 (owner=false) がpush/unshareする際に必要 */
+  zoneOwnerName?: string
 }
 
 export interface Pos {

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { AddStoreSheet } from '../components/AddStoreSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
+import { CloudShareSection } from '../components/CloudShareSection'
 import { Sheet } from '../components/Sheet'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, ShoppingItem } from '../types'
@@ -27,6 +28,8 @@ export function ListScreen() {
     setTab,
     createStore,
     addSampleStore,
+    shareList,
+    unshareList,
   } = useAppStore()
 
   const [draft, setDraft] = useState('')
@@ -238,6 +241,11 @@ export function ListScreen() {
           <span>このリストの名前</span>
           <input type="text" value={list.name} onChange={(e) => renameList(list.id, e.target.value)} />
         </label>
+        <CloudShareSection
+          cloud={list.cloud}
+          onShare={() => shareList(list.id)}
+          onUnshare={() => unshareList(list.id)}
+        />
         <ul className="list-rows">
           {lists.map((l) => (
             <li key={l.id}>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AddStoreSheet } from '../components/AddStoreSheet'
 import { AiFloorPlanSheet } from '../components/AiFloorPlanSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
+import { CloudShareSection } from '../components/CloudShareSection'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
 import { cellAt, nodePos } from '../lib/grid'
@@ -59,6 +60,8 @@ export function MapScreen() {
     undoMap,
     importFloorLayout,
     cleanupMap,
+    shareStore,
+    unshareStore,
   } = useAppStore()
 
   const [storeId, setStoreId] = useState<string | null>(stores[0]?.id ?? null)
@@ -606,6 +609,11 @@ export function MapScreen() {
             onChange={(e) => setCellMeters(store.id, Number(e.target.value) || 1.2)}
           />
         </label>
+        <CloudShareSection
+          cloud={store.cloud}
+          onShare={() => shareStore(store.id)}
+          onUnshare={() => unshareStore(store.id)}
+        />
         {stores.length > 1 && (
           <button
             type="button"

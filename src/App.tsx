@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { startCloudSyncBridge } from './lib/cloudSyncBridge'
 import { GenreScreen } from './screens/GenreScreen'
 import { ListScreen } from './screens/ListScreen'
 import { MapScreen } from './screens/MapScreen'
@@ -25,6 +27,10 @@ export default function App() {
   const store = useListStore(list)
 
   const remaining = list?.items.filter((i) => !i.checked).length ?? 0
+
+  useEffect(() => {
+    startCloudSyncBridge()
+  }, [])
 
   return (
     <div className="app">
