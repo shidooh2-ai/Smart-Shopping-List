@@ -57,7 +57,16 @@ export interface CloudSyncPluginApi {
 
 export const CloudSync = registerPlugin<CloudSyncPluginApi>('CloudSync')
 
+/**
+ * 保留フラグ: iCloud共有機能は実装済みだが、現在ネイティブ側でプラグイン登録を止めている
+ * (Xcodeプロジェクトが無料のPersonal Teamのため、iCloud/CloudKit capabilityを追加できず、
+ *  CKContainer.default() がクラッシュする — ios/App/App/MainViewController.swift 参照)。
+ * 有料のApple Developer Programに登録し、Xcodeでcapabilityを追加してネイティブ側を
+ * 元に戻したら、ここも true にして機能を復活させる。
+ */
+const CLOUD_SYNC_ENABLED = false
+
 /** CloudKit共有はiPhoneアプリ (Capacitor/iOS) 上でのみ使える。Web版では常にfalse。 */
 export function isCloudSyncSupported(): boolean {
-  return Capacitor.getPlatform() === 'ios'
+  return CLOUD_SYNC_ENABLED && Capacitor.getPlatform() === 'ios'
 }
