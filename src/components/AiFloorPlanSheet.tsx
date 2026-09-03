@@ -127,7 +127,16 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
         <img
           src={preview}
           alt="選択した見取り図のプレビュー"
-          style={{ width: '100%', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 12 }}
+          style={{
+            display: 'block',
+            width: '100%',
+            maxHeight: '40vh',
+            objectFit: 'contain',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            marginBottom: 12,
+            background: 'var(--surface-2)',
+          }}
         />
       )}
 
