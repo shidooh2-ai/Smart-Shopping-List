@@ -13,5 +13,12 @@ class MainViewController: CAPBridgeViewController {
         // 有料のApple Developer Programに登録し、Signing & Capabilitiesで
         // iCloud (CloudKit) を追加できるようになったら、下の行のコメントを外して再登録する。
         // bridge?.registerPluginInstance(CloudSyncPlugin())
+
+        // 保留中: ホーム画面ウィジェット。WidgetBridgePlugin.swift と
+        // ShoppingListWidget/SharedSnapshot.swift をXcodeでアプリ本体ターゲットに追加すると
+        // ビルドが通るようになるので、そのタイミングで下の行のコメントを外す。
+        // (ウィジェット自体には App Group が必要で、これも有料登録が前提)
+        // 手順は ios/App/ShoppingListWidget/ShoppingListWidget.swift の冒頭コメント参照。
+        // bridge?.registerPluginInstance(WidgetBridgePlugin())
     }
 }
