@@ -1,17 +1,26 @@
 import { useState } from 'react'
+import { ViewSwitch } from '../components/ViewSwitch'
 import { isWakeLockSupported } from '../lib/wakeLock'
 import { useAppStore } from '../store/useAppStore'
+
+const SETTINGS_VIEWS = [
+  { id: 'settings' as const, label: '設定' },
+  { id: 'map' as const, label: 'マップ' },
+  { id: 'genre' as const, label: 'ジャンル' },
+]
 
 export function SettingsScreen() {
   const nickname = useAppStore((s) => s.nickname)
   const setNickname = useAppStore((s) => s.setNickname)
   const screenWakeLockEnabled = useAppStore((s) => s.screenWakeLockEnabled)
   const setScreenWakeLockEnabled = useAppStore((s) => s.setScreenWakeLockEnabled)
+  const setSettingsView = useAppStore((s) => s.setSettingsView)
   const [name, setName] = useState(nickname)
   const wakeLockSupported = isWakeLockSupported()
 
   return (
     <div className="screen">
+      <ViewSwitch options={SETTINGS_VIEWS} active="settings" onChange={setSettingsView} />
       <div className="card">
         <h2>ニックネーム</h2>
         <p className="muted" style={{ marginTop: 0 }}>

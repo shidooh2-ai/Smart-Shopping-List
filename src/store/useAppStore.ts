@@ -23,12 +23,10 @@ import type {
   StoreMap,
 } from '../types'
 
-/** 下段タブバーの3つの大分類。リスト/ルート、マップ/ジャンルはそれぞれ画面内のセグメントで切り替える */
-export type Tab = 'shopping' | 'store' | 'settings'
-/** 「買い物」タブ内で切り替える画面 */
-export type ShoppingView = 'list' | 'route'
-/** 「お店」タブ内で切り替える画面 */
-export type StoreView = 'map' | 'genre'
+/** 下段タブバーの3つの画面 */
+export type Tab = 'list' | 'route' | 'settings'
+/** 「設定」タブ内で切り替える画面。マップとジャンルの編集もここに含める */
+export type SettingsView = 'settings' | 'map' | 'genre'
 
 export type PaintTool =
   | { kind: 'aisle' }
@@ -49,10 +47,8 @@ export interface AppState {
   aliases: Record<string, string>
   activeListId: string | null
   tab: Tab
-  /** 「買い物」タブ内でリスト/ルートのどちらを表示するか */
-  shoppingView: ShoppingView
-  /** 「お店」タブ内でマップ/ジャンルのどちらを表示するか */
-  storeView: StoreView
+  /** 「設定」タブ内で設定/マップ/ジャンルのどれを表示するか */
+  settingsView: SettingsView
   /** 階をまたぐルート計算で階段/エレベーターのどちらを優先するか */
   routePreference: RoutePreference
   /** 自分のニックネーム。品目に「追加した人」として記録される (リスト共有時に使う) */
@@ -65,8 +61,7 @@ export interface AppState {
   mapRedo: Record<string, StoreMap[]>
 
   setTab: (tab: Tab) => void
-  setShoppingView: (view: ShoppingView) => void
-  setStoreView: (view: StoreView) => void
+  setSettingsView: (view: SettingsView) => void
   setRoutePreference: (preference: RoutePreference) => void
   setNickname: (nickname: string) => void
   setScreenWakeLockEnabled: (enabled: boolean) => void
@@ -185,9 +180,8 @@ function initialState() {
     purchased: [] as PurchasedItem[],
     aliases: {} as Record<string, string>,
     activeListId: list.id,
-    tab: 'shopping' as Tab,
-    shoppingView: 'list' as ShoppingView,
-    storeView: 'map' as StoreView,
+    tab: 'list' as Tab,
+    settingsView: 'settings' as SettingsView,
     routePreference: 'balanced' as RoutePreference,
     nickname: '',
     screenWakeLockEnabled: false,
@@ -291,8 +285,7 @@ export const useAppStore = create<AppState>()(
       ...initialState(),
 
       setTab: (tab) => set({ tab }),
-      setShoppingView: (shoppingView) => set({ shoppingView }),
-      setStoreView: (storeView) => set({ storeView }),
+      setSettingsView: (settingsView) => set({ settingsView }),
       setRoutePreference: (routePreference) => set({ routePreference }),
       setNickname: (nickname) => set({ nickname }),
       setScreenWakeLockEnabled: (screenWakeLockEnabled) => set({ screenWakeLockEnabled }),

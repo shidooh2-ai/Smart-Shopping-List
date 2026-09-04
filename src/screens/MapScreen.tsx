@@ -15,7 +15,8 @@ import type { NodeKind, StoreMap } from '../types'
 
 type ToolId = 'select' | 'aisle' | 'wall' | 'shelf' | NodeKind
 
-const STORE_VIEWS = [
+const SETTINGS_VIEWS = [
+  { id: 'settings' as const, label: '設定' },
   { id: 'map' as const, label: 'マップ' },
   { id: 'genre' as const, label: 'ジャンル' },
 ]
@@ -70,7 +71,7 @@ export function MapScreen() {
     cleanupMap,
     shareStore,
     unshareStore,
-    setStoreView,
+    setSettingsView,
   } = useAppStore()
 
   const [storeId, setStoreId] = useState<string | null>(stores[0]?.id ?? null)
@@ -123,7 +124,7 @@ export function MapScreen() {
   if (!store || !floor) {
     return (
       <div className="screen">
-        <ViewSwitch options={STORE_VIEWS} active="map" onChange={setStoreView} />
+        <ViewSwitch options={SETTINGS_VIEWS} active="map" onChange={setSettingsView} />
         <div className="empty">
           店舗マップがありません。
           <div className="row" style={{ justifyContent: 'center', marginTop: 12 }}>
@@ -188,7 +189,7 @@ export function MapScreen() {
 
   return (
     <div className="screen">
-      <ViewSwitch options={STORE_VIEWS} active="map" onChange={setStoreView} />
+      <ViewSwitch options={SETTINGS_VIEWS} active="map" onChange={setSettingsView} />
       <div className="card">
         <div className="row">
           <select value={store.id} onChange={(e) => switchToStore(e.target.value)} style={{ flex: 1 }}>

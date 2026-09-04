@@ -102,7 +102,7 @@ describe('buildGraph', () => {
       expect(dist[goal]).toBe(16)
     })
 
-    it('階段優先ならバランスと同じく階段経由のまま', () => {
+    it('階段優先なら距離優先と同じく階段経由のまま', () => {
       const map = twoWayMap()
       const g = buildGraph(map, 'stairs')
       const start = g.index.get(`${map.floors[0].id}:1,1`)!

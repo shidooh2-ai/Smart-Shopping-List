@@ -3,15 +3,9 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
-import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, CloudLink, ShoppingItem } from '../types'
-
-const SHOPPING_VIEWS = [
-  { id: 'list' as const, label: 'リスト' },
-  { id: 'route' as const, label: 'ルート' },
-]
 
 /** 「リスト管理」シート内の表示状態。一覧か、既存/新規リストの名前・色編集か。 */
 type ListSheetMode = { kind: 'menu' } | { kind: 'edit'; listId: string } | { kind: 'new' }
@@ -34,7 +28,6 @@ export function ListScreen() {
     deleteList,
     updateList,
     setActiveList,
-    setShoppingView,
     shareList,
     unshareList,
   } = useAppStore()
@@ -51,7 +44,6 @@ export function ListScreen() {
   if (!list) {
     return (
       <div className="screen">
-        <ViewSwitch options={SHOPPING_VIEWS} active="list" onChange={setShoppingView} />
         <div className="empty">
           リストがありません。
           <br />
@@ -90,7 +82,6 @@ export function ListScreen() {
 
   return (
     <div className="screen">
-      <ViewSwitch options={SHOPPING_VIEWS} active="list" onChange={setShoppingView} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
           <span

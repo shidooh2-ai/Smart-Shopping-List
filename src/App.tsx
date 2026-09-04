@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { ListGlyph, MapGlyph, SettingsGlyph } from './components/icons'
+import { ListGlyph, RouteGlyph, SettingsGlyph } from './components/icons'
 import { startCloudSyncBridge } from './lib/cloudSyncBridge'
 import { useScreenWakeLock } from './lib/wakeLock'
 import { GenreScreen } from './screens/GenreScreen'
@@ -10,16 +10,15 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { type Tab, useAppStore } from './store/useAppStore'
 
 const TABS: Array<{ id: Tab; label: string; Icon: typeof ListGlyph }> = [
-  { id: 'shopping', label: '買い物', Icon: ListGlyph },
-  { id: 'store', label: 'お店', Icon: MapGlyph },
+  { id: 'list', label: 'リスト', Icon: ListGlyph },
+  { id: 'route', label: 'ルート', Icon: RouteGlyph },
   { id: 'settings', label: '設定', Icon: SettingsGlyph },
 ]
 
 export default function App() {
   const tab = useAppStore((s) => s.tab)
   const setTab = useAppStore((s) => s.setTab)
-  const shoppingView = useAppStore((s) => s.shoppingView)
-  const storeView = useAppStore((s) => s.storeView)
+  const settingsView = useAppStore((s) => s.settingsView)
   const screenWakeLockEnabled = useAppStore((s) => s.screenWakeLockEnabled)
 
   useEffect(() => {
@@ -31,9 +30,10 @@ export default function App() {
   return (
     <div className="app">
       <main className="screen-host" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {tab === 'shopping' && (shoppingView === 'list' ? <ListScreen /> : <RouteScreen />)}
-        {tab === 'store' && (storeView === 'map' ? <MapScreen /> : <GenreScreen />)}
-        {tab === 'settings' && <SettingsScreen />}
+        {tab === 'list' && <ListScreen />}
+        {tab === 'route' && <RouteScreen />}
+        {tab === 'settings' &&
+          (settingsView === 'map' ? <MapScreen /> : settingsView === 'genre' ? <GenreScreen /> : <SettingsScreen />)}
       </main>
 
       <nav className="tabbar">

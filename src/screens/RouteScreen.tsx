@@ -1,19 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
-import { ViewSwitch } from '../components/ViewSwitch'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
 import type { RoutePreference, ShoppingItem } from '../types'
 
 const PREFERENCE_OPTIONS: Array<{ id: RoutePreference; label: string }> = [
-  { id: 'balanced', label: 'バランス' },
+  { id: 'balanced', label: '距離優先' },
   { id: 'stairs', label: '階段優先' },
   { id: 'elevator', label: 'エレベーター優先' },
-]
-
-const SHOPPING_VIEWS = [
-  { id: 'list' as const, label: 'リスト' },
-  { id: 'route' as const, label: 'ルート' },
 ]
 
 export function RouteScreen() {
@@ -22,7 +16,6 @@ export function RouteScreen() {
   const lists = useAppStore((s) => s.lists)
   const stores = useAppStore((s) => s.stores)
   const categories = useAppStore((s) => s.categories)
-  const setShoppingView = useAppStore((s) => s.setShoppingView)
   const setActiveList = useAppStore((s) => s.setActiveList)
   const setListStore = useAppStore((s) => s.setListStore)
   const setItemChecked = useAppStore((s) => s.setItemChecked)
@@ -30,7 +23,7 @@ export function RouteScreen() {
   const routePreference = useAppStore((s) => s.routePreference)
   const setRoutePreference = useAppStore((s) => s.setRoutePreference)
   const setTab = useAppStore((s) => s.setTab)
-  const setStoreView = useAppStore((s) => s.setStoreView)
+  const setSettingsView = useAppStore((s) => s.setSettingsView)
   const [floorId, setFloorId] = useState<string | null>(null)
   const [activeStop, setActiveStop] = useState<number | null>(null)
 
@@ -62,7 +55,6 @@ export function RouteScreen() {
   if (!list) {
     return (
       <div className="screen">
-        <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
         <div className="empty">リストがありません。</div>
       </div>
     )
@@ -122,8 +114,6 @@ export function RouteScreen() {
 
   return (
     <div className="screen">
-      <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
-
       <div className="card">
         <label className="field">
           <span>買い物リスト</span>
@@ -157,11 +147,11 @@ export function RouteScreen() {
               className="btn slim"
               style={{ margin: '0 4px' }}
               onClick={() => {
-                setStoreView('map')
-                setTab('store')
+                setSettingsView('map')
+                setTab('settings')
               }}
             >
-              お店タブ
+              設定 → マップ
             </button>
             で追加できます。
           </p>

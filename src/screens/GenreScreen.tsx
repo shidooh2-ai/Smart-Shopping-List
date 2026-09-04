@@ -6,7 +6,8 @@ import { buildIndex, detectCategory } from '../lib/genre'
 import { useAppStore } from '../store/useAppStore'
 import type { Category } from '../types'
 
-const STORE_VIEWS = [
+const SETTINGS_VIEWS = [
+  { id: 'settings' as const, label: '設定' },
   { id: 'map' as const, label: 'マップ' },
   { id: 'genre' as const, label: 'ジャンル' },
 ]
@@ -18,7 +19,7 @@ export function GenreScreen() {
   const lists = useAppStore((s) => s.lists)
   const purchased = useAppStore((s) => s.purchased)
   const nickname = useAppStore((s) => s.nickname)
-  const setStoreView = useAppStore((s) => s.setStoreView)
+  const setSettingsView = useAppStore((s) => s.setSettingsView)
   const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias, replaceAll } = useAppStore()
 
   const [editing, setEditing] = useState<string | null>(null)
@@ -80,7 +81,7 @@ export function GenreScreen() {
 
   return (
     <div className="screen">
-      <ViewSwitch options={STORE_VIEWS} active="genre" onChange={setStoreView} />
+      <ViewSwitch options={SETTINGS_VIEWS} active="genre" onChange={setSettingsView} />
       <div className="card">
         <h2>ジャンル判定を試す</h2>
         <input
