@@ -44,6 +44,8 @@ export interface AppState {
   routePreference: RoutePreference
   /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
   mapHistory: Record<string, StoreMap[]>
+  /** storeId ごとの「やり直す」用スナップショット (元に戻す操作で積む)。保存はしない */
+  mapRedo: Record<string, StoreMap[]>
 
   setTab: (tab: Tab) => void
   setRoutePreference: (preference: RoutePreference) => void
@@ -108,6 +110,8 @@ export interface AppState {
   ) => void
   /** 直前の paint / importFloorLayout 操作を1回取り消す */
   undoMap: (storeId: string) => void
+  /** undoMap で取り消した操作を1回やり直す */
+  redoMap: (storeId: string) => void
   cleanupMap: (storeId: string) => void
 
   replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases'>>) => void
@@ -147,6 +151,7 @@ function initialState() {
     tab: 'list' as Tab,
     routePreference: 'balanced' as RoutePreference,
     mapHistory: {} as Record<string, StoreMap[]>,
+    mapRedo: {} as Record<string, StoreMap[]>,
   }
 }
 
@@ -568,8 +573,11 @@ export const useAppStore = create<AppState>()(
                 [storeId]: [...(s.mapHistory[storeId] ?? []).slice(-(MAP_HISTORY_LIMIT - 1)), before],
               }
             : s.mapHistory
+          // 新しい編集をしたら、それ以前の「取り消し」に対する「やり直し」は意味が無くなる
+          const mapRedo = before ? { ...s.mapRedo, [storeId]: [] } : s.mapRedo
           return {
             mapHistory,
+            mapRedo,
             stores: mapStore(s.stores, storeId, (st) => {
               const floor = st.floors.find((f) => f.id === floorId)
               if (!floor) return st
@@ -625,8 +633,10 @@ export const useAppStore = create<AppState>()(
                 [storeId]: [...(s.mapHistory[storeId] ?? []).slice(-(MAP_HISTORY_LIMIT - 1)), before],
               }
             : s.mapHistory
+          const mapRedo = before ? { ...s.mapRedo, [storeId]: [] } : s.mapRedo
           return {
             mapHistory,
+            mapRedo,
             stores: mapStore(s.stores, storeId, (st) => {
               const floor = st.floors.find((f) => f.id === floorId)
               if (!floor) return st
@@ -654,9 +664,30 @@ export const useAppStore = create<AppState>()(
           const hist = s.mapHistory[storeId]
           if (!hist || hist.length === 0) return {}
           const prev = hist[hist.length - 1]
+          const current = s.stores.find((st) => st.id === storeId)
+          const redo = s.mapRedo[storeId] ?? []
           return {
             mapHistory: { ...s.mapHistory, [storeId]: hist.slice(0, -1) },
+            mapRedo: current
+              ? { ...s.mapRedo, [storeId]: [...redo.slice(-(MAP_HISTORY_LIMIT - 1)), current] }
+              : s.mapRedo,
             stores: s.stores.map((st) => (st.id === storeId ? prev : st)),
+          }
+        }),
+
+      redoMap: (storeId) =>
+        set((s) => {
+          const redo = s.mapRedo[storeId]
+          if (!redo || redo.length === 0) return {}
+          const next = redo[redo.length - 1]
+          const current = s.stores.find((st) => st.id === storeId)
+          const hist = s.mapHistory[storeId] ?? []
+          return {
+            mapRedo: { ...s.mapRedo, [storeId]: redo.slice(0, -1) },
+            mapHistory: current
+              ? { ...s.mapHistory, [storeId]: [...hist.slice(-(MAP_HISTORY_LIMIT - 1)), current] }
+              : s.mapHistory,
+            stores: s.stores.map((st) => (st.id === storeId ? next : st)),
           }
         }),
 

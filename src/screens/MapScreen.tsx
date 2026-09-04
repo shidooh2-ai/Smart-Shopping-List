@@ -59,6 +59,7 @@ export function MapScreen() {
     updateNode,
     paint,
     undoMap,
+    redoMap,
     importFloorLayout,
     cleanupMap,
     shareStore,
@@ -85,6 +86,7 @@ export function MapScreen() {
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
   const canUndo = useAppStore((s) => (store ? (s.mapHistory[store.id]?.length ?? 0) > 0 : false))
+  const canRedo = useAppStore((s) => (store ? (s.mapRedo[store.id]?.length ?? 0) > 0 : false))
 
   const switchToStore = (id: string) => {
     setStoreId(id)
@@ -305,6 +307,9 @@ export function MapScreen() {
           <span className="spacer" />
           <button type="button" className="btn slim" disabled={!canUndo} onClick={() => store && undoMap(store.id)}>
             ↶ 元に戻す
+          </button>
+          <button type="button" className="btn slim" disabled={!canRedo} onClick={() => store && redoMap(store.id)}>
+            ↷ やり直す
           </button>
         </div>
         <div className="tools">
