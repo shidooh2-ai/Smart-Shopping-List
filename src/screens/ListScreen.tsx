@@ -4,8 +4,14 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
+import { ViewSwitch } from '../components/ViewSwitch'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, ShoppingItem } from '../types'
+
+const SHOPPING_VIEWS = [
+  { id: 'list' as const, label: 'リスト' },
+  { id: 'route' as const, label: 'ルート' },
+]
 
 export function ListScreen() {
   const list = useActiveList()
@@ -28,6 +34,8 @@ export function ListScreen() {
     renameList,
     setActiveList,
     setTab,
+    setShoppingView,
+    setStoreView,
     createStore,
     addSampleStore,
     shareList,
@@ -47,6 +55,7 @@ export function ListScreen() {
   if (!list) {
     return (
       <div className="screen">
+        <ViewSwitch options={SHOPPING_VIEWS} active="list" onChange={setShoppingView} />
         <div className="empty">
           リストがありません。
           <br />
@@ -85,6 +94,7 @@ export function ListScreen() {
 
   return (
     <div className="screen">
+      <ViewSwitch options={SHOPPING_VIEWS} active="list" onChange={setShoppingView} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
           <strong style={{ flex: 1, minWidth: 0 }}>{list.name}</strong>
@@ -118,7 +128,15 @@ export function ListScreen() {
         {!list.storeId && (
           <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
             店舗を選ぶとルートを作成できます。マップの作り方は
-            <button type="button" className="btn slim" style={{ margin: '0 4px' }} onClick={() => setTab('map')}>
+            <button
+              type="button"
+              className="btn slim"
+              style={{ margin: '0 4px' }}
+              onClick={() => {
+                setStoreView('map')
+                setTab('store')
+              }}
+            >
               マップ画面
             </button>
             から。

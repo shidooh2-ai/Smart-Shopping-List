@@ -5,6 +5,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
+import { ViewSwitch } from '../components/ViewSwitch'
 import { fileToBackgroundImage } from '../lib/aiFloorPlan'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
@@ -13,6 +14,11 @@ import { type PaintTool, useAppStore } from '../store/useAppStore'
 import type { NodeKind, StoreMap } from '../types'
 
 type ToolId = 'select' | 'aisle' | 'wall' | 'shelf' | NodeKind
+
+const STORE_VIEWS = [
+  { id: 'map' as const, label: 'マップ' },
+  { id: 'genre' as const, label: 'ジャンル' },
+]
 
 const TOOLS: Array<{ id: ToolId; label: string; swatch: string }> = [
   { id: 'select', label: '選択', swatch: 'transparent' },
@@ -64,6 +70,7 @@ export function MapScreen() {
     cleanupMap,
     shareStore,
     unshareStore,
+    setStoreView,
   } = useAppStore()
 
   const [storeId, setStoreId] = useState<string | null>(stores[0]?.id ?? null)
@@ -116,6 +123,7 @@ export function MapScreen() {
   if (!store || !floor) {
     return (
       <div className="screen">
+        <ViewSwitch options={STORE_VIEWS} active="map" onChange={setStoreView} />
         <div className="empty">
           店舗マップがありません。
           <div className="row" style={{ justifyContent: 'center', marginTop: 12 }}>
@@ -180,6 +188,7 @@ export function MapScreen() {
 
   return (
     <div className="screen">
+      <ViewSwitch options={STORE_VIEWS} active="map" onChange={setStoreView} />
       <div className="card">
         <div className="row">
           <select value={store.id} onChange={(e) => switchToStore(e.target.value)} style={{ flex: 1 }}>

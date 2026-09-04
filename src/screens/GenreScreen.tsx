@@ -1,8 +1,14 @@
 import { useMemo, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
+import { ViewSwitch } from '../components/ViewSwitch'
 import { buildIndex, detectCategory } from '../lib/genre'
 import { useAppStore } from '../store/useAppStore'
 import type { Category } from '../types'
+
+const STORE_VIEWS = [
+  { id: 'map' as const, label: 'マップ' },
+  { id: 'genre' as const, label: 'ジャンル' },
+]
 
 const PALETTE = [
   '#7cb342', '#ef6c00', '#d84315', '#0288d1', '#f9a825', '#a1887f', '#8d6e63', '#fdd835',
@@ -17,6 +23,7 @@ export function GenreScreen() {
   const lists = useAppStore((s) => s.lists)
   const purchased = useAppStore((s) => s.purchased)
   const nickname = useAppStore((s) => s.nickname)
+  const setStoreView = useAppStore((s) => s.setStoreView)
   const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias, replaceAll } = useAppStore()
 
   const [editing, setEditing] = useState<string | null>(null)
@@ -78,6 +85,7 @@ export function GenreScreen() {
 
   return (
     <div className="screen">
+      <ViewSwitch options={STORE_VIEWS} active="genre" onChange={setStoreView} />
       <div className="card">
         <h2>ジャンル判定を試す</h2>
         <input

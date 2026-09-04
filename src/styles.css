@@ -121,7 +121,8 @@ textarea {
   z-index: 10;
   min-height: var(--tabbar-h);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 4px;
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -656,6 +657,18 @@ label.field > span {
 .floortabs button[aria-pressed='true'] {
   background: var(--accent-weak);
   color: var(--accent);
+}
+
+.view-switch {
+  overflow: visible;
+  margin: 0 0 12px;
+}
+
+.view-switch button {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  padding: 10px 12px;
 }
 
 .tools {

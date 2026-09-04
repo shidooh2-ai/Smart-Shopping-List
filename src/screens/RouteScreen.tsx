@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
+import { ViewSwitch } from '../components/ViewSwitch'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
 import type { RoutePreference, ShoppingItem } from '../types'
@@ -10,11 +11,16 @@ const PREFERENCE_OPTIONS: Array<{ id: RoutePreference; label: string }> = [
   { id: 'elevator', label: 'エレベーター優先' },
 ]
 
+const SHOPPING_VIEWS = [
+  { id: 'list' as const, label: 'リスト' },
+  { id: 'route' as const, label: 'ルート' },
+]
+
 export function RouteScreen() {
   const list = useActiveList()
   const store = useListStore(list)
   const categories = useAppStore((s) => s.categories)
-  const setTab = useAppStore((s) => s.setTab)
+  const setShoppingView = useAppStore((s) => s.setShoppingView)
   const setItemChecked = useAppStore((s) => s.setItemChecked)
   const markPurchased = useAppStore((s) => s.markPurchased)
   const routePreference = useAppStore((s) => s.routePreference)
@@ -41,15 +47,28 @@ export function RouteScreen() {
     return set
   }, [plan, itemById])
 
-  if (!list) return <div className="screen"><div className="empty">リストがありません。</div></div>
+  if (!list) {
+    return (
+      <div className="screen">
+        <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
+        <div className="empty">リストがありません。</div>
+      </div>
+    )
+  }
 
   if (!store) {
     return (
       <div className="screen">
+        <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
         <div className="empty">
           このリストには店舗が設定されていません。
           <br />
-          <button type="button" className="btn primary" style={{ marginTop: 12 }} onClick={() => setTab('list')}>
+          <button
+            type="button"
+            className="btn primary"
+            style={{ marginTop: 12 }}
+            onClick={() => setShoppingView('list')}
+          >
             リスト画面で店舗を選ぶ
           </button>
         </div>
@@ -108,6 +127,7 @@ export function RouteScreen() {
 
   return (
     <div className="screen">
+      <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
       {showPreference && (
         <div className="card">
           <h2>階段・エレベーターの優先</h2>
