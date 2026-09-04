@@ -5,6 +5,12 @@ export interface SheetProps {
   title: string
   onClose: () => void
   children: ReactNode
+  /**
+   * 内容が長くてスクロールが必要な場合でも常に見える位置に固定したい要素
+   * (主に確定ボタン)。指定すると .content の下に、スクロールに関わらず
+   * 常に表示される領域として描画される。
+   */
+  footer?: ReactNode
 }
 
 /**
@@ -35,7 +41,7 @@ function useVisualViewport(active: boolean) {
 }
 
 /** 画面下から出るモーダル。モバイルでの片手操作を想定。 */
-export function Sheet({ open, title, onClose, children }: SheetProps) {
+export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   const viewport = useVisualViewport(open)
 
   useEffect(() => {
@@ -69,6 +75,7 @@ export function Sheet({ open, title, onClose, children }: SheetProps) {
           </button>
         </header>
         <div className="content">{children}</div>
+        {footer && <div className="sheet-footer">{footer}</div>}
       </div>
     </div>
   )

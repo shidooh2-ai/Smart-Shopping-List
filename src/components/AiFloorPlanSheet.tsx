@@ -90,7 +90,30 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
   }
 
   return (
-    <Sheet open={open} title="見取り図から自動生成" onClose={close}>
+    <Sheet
+      open={open}
+      title="見取り図から自動生成"
+      onClose={close}
+      footer={
+        <>
+          {status === 'analyzing' && (
+            <p className="muted" style={{ marginTop: 0 }}>
+              画像を解析しています…（数十秒かかることがあります）
+            </p>
+          )}
+          {error && <div className="banner">{error}</div>}
+          <button
+            type="button"
+            className="btn primary"
+            style={{ width: '100%' }}
+            disabled={!file || status === 'analyzing'}
+            onClick={() => void generate()}
+          >
+            {status === 'analyzing' ? '生成中…' : 'この画像から生成する'}
+          </button>
+        </>
+      }
+    >
       <p className="muted" style={{ marginTop: 0 }}>
         店内の見取り図を撮影・アップロードすると、AI (Google Gemini) が棚・通路・入口・レジなどを読み取って自動配置します。今のフロアの内容は上書きされます（「元に戻す」で戻せます）。無料枠のあるモデルを使うので、通常の利用なら課金なしで試せます。
       </p>
@@ -139,19 +162,6 @@ export function AiFloorPlanSheet({ open, onClose, categories, floorId, onGenerat
           }}
         />
       )}
-
-      {status === 'analyzing' && <p className="muted">画像を解析しています…（数十秒かかることがあります）</p>}
-      {error && <div className="banner">{error}</div>}
-
-      <button
-        type="button"
-        className="btn primary"
-        style={{ width: '100%' }}
-        disabled={!file || status === 'analyzing'}
-        onClick={() => void generate()}
-      >
-        {status === 'analyzing' ? '生成中…' : 'この画像から生成する'}
-      </button>
     </Sheet>
   )
 }
