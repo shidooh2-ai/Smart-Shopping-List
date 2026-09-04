@@ -70,10 +70,10 @@ export function RouteScreen() {
   const missing = plan?.missingCategoryIds ?? []
   const unreachable = plan?.unreachableCategoryIds ?? []
 
-  // ルートに含められない品目 (未購入分) も、理由つきで一覧には出しておく。
-  const unresolvedItems = unresolved.map((id) => itemById.get(id)).filter((i): i is ShoppingItem => !!i)
+  // ルートに含められない品目も、理由つきで一覧には出しておく (チェック済みでも消さず、薄く表示する)。
+  const unresolvedItems = list.items.filter((i) => !i.categoryId)
   const byCategoryItems = (categoryIds: string[]) =>
-    list.items.filter((i) => !i.checked && i.categoryId && categoryIds.includes(i.categoryId))
+    list.items.filter((i) => i.categoryId && categoryIds.includes(i.categoryId))
   const missingItems = byCategoryItems(missing)
   const unreachableItems = byCategoryItems(unreachable)
 
@@ -88,6 +88,23 @@ export function RouteScreen() {
       markPurchased(list.id, checkedItemIds)
     }
   }
+
+  /** ルートに含められない品目の行。灰色の破線表示のまま、チェック(購入)はできるようにする。 */
+  const renderUnroutedRow = (item: ShoppingItem, dotColor: string, reason: string) => (
+    <li key={item.id} className={`unrouted${item.checked ? ' done' : ''}`}>
+      <span className="dot" style={{ background: dotColor }} />
+      <span className="grow">
+        <span className="title">{item.text}</span>
+        <span className="muted">{reason}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={item.checked}
+        onChange={(e) => setItemChecked(list.id, item.id, e.target.checked)}
+        aria-label={`${item.text} を購入済みにする`}
+      />
+    </li>
+  )
 
   return (
     <div className="screen">
@@ -280,37 +297,23 @@ export function RouteScreen() {
         <div className="card">
           <h2>ルートに含まれていない品目</h2>
           <ul className="list-rows">
-            {unresolvedItems.map((item) => (
-              <li key={item.id} className="unrouted">
-                <span className="dot" style={{ background: 'var(--outline)' }} />
-                <span className="grow">
-                  <span className="title">{item.text}</span>
-                  <span className="muted">理由: ジャンル未設定</span>
-                </span>
-              </li>
-            ))}
-            {missingItems.map((item) => (
-              <li key={item.id} className="unrouted">
-                <span className="dot" style={{ background: byId.get(item.categoryId!)?.color ?? 'var(--outline)' }} />
-                <span className="grow">
-                  <span className="title">{item.text}</span>
-                  <span className="muted">
-                    {catName(item.categoryId!)} ・ 理由: この店舗に売り場がありません
-                  </span>
-                </span>
-              </li>
-            ))}
-            {unreachableItems.map((item) => (
-              <li key={item.id} className="unrouted">
-                <span className="dot" style={{ background: byId.get(item.categoryId!)?.color ?? 'var(--outline)' }} />
-                <span className="grow">
-                  <span className="title">{item.text}</span>
-                  <span className="muted">
-                    {catName(item.categoryId!)} ・ 理由: 入口からたどり着けません
-                  </span>
-                </span>
-              </li>
-            ))}
+            {unresolvedItems.map((item) =>
+              renderUnroutedRow(item, 'var(--outline)', '理由: ジャンル未設定'),
+            )}
+            {missingItems.map((item) =>
+              renderUnroutedRow(
+                item,
+                byId.get(item.categoryId!)?.color ?? 'var(--outline)',
+                `${catName(item.categoryId!)} ・ 理由: この店舗に売り場がありません`,
+              ),
+            )}
+            {unreachableItems.map((item) =>
+              renderUnroutedRow(
+                item,
+                byId.get(item.categoryId!)?.color ?? 'var(--outline)',
+                `${catName(item.categoryId!)} ・ 理由: 入口からたどり着けません`,
+              ),
+            )}
           </ul>
         </div>
       )}

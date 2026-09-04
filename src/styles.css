@@ -454,6 +454,29 @@ label.field > span {
   margin-top: 0;
 }
 
+.group-toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-toggle .chevron {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 /* ---------- ルート ---------- */
 .metrics-card {
   background: none;
@@ -856,6 +879,21 @@ label.field > span {
 
 .list-rows li.unrouted .title {
   color: var(--text-dim);
+}
+
+.list-rows li.unrouted input[type='checkbox'] {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+.list-rows li.unrouted.done {
+  opacity: 0.45;
+}
+
+.list-rows li.unrouted.done .title {
+  text-decoration: line-through;
 }
 
 .list-rows .grow {
