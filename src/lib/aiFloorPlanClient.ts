@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai'
 import type { GenerateContentResponse } from '@google/genai'
+import { ZONE_KINDS } from './aiFloorPlan'
 import type { FloorPlanResult } from './aiFloorPlan'
 
 /**
@@ -21,8 +22,6 @@ import type { FloorPlanResult } from './aiFloorPlan'
  * 通常の flash にフォールバックする (analyzeFloorPlan 参照)。
  */
 export const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest'] as const
-
-const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
 
 /**
  * Gemini の構造化出力には responseJsonSchema (新しめ) と responseSchema (旧来の
@@ -63,20 +62,20 @@ const ZONE_SCHEMA = {
 } as const
 
 const PROMPT = `これはスーパーマーケットの店舗見取り図（手描き・印刷・CADいずれも可）の画像です。
+マス目地図は最初からすべて「通路」として作られ、そこにあなたが書き出した区画を上から置いていきます。
 画像全体を横1.0×縦1.0とした相対座標（左上が(0,0)、右下が(1,1)）で、次の種類の区画をすべて矩形として書き出してください。
 
-- wall: 壁・外周・柱など、通行も陳列もできない場所
 - shelf: 商品棚・什器・レジ台の陳列スペースなど、商品が置かれている場所
-- aisle: 通路。棚の間の通行スペースを明示したいときや、棚の中に通路が切れ込んでいる場合に使う
+- aisle: 通路。棚に囲まれていて自動では通路と判定されにくい部分 (棚の間の狭い通路や、棚の中に通路が切れ込んでいる場合) を明示したいときに使う
 - entrance: 入口・出入口
 - checkout: レジ
 - stairs: 階段
 - elevator: エレベーター
 
 注意事項:
+- 壁は判定不要です。棚が置かれていない場所はすべて自動的に通路として扱われます。壁や間仕切りの線に惑わされず、実際に商品が並んでいる棚の範囲だけを shelf として書き出してください。
+- 棚と棚の間には必ず人が通れる通路が実在するはずです。棚の矩形どうしを隙間なく隣接させたり重ねたりせず、実際の写真で通路に見える幅ぶんは空けてください。
 - 棚や区画に書かれている文字・記号（「青果」「精肉」「①」など）があれば label にそのまま書き写してください。読み取れない・何も書かれていない場合は label を省略してください。
-- 通路や什器のない空間は自動的に通路として扱われるので、余白をすべて aisle で埋める必要はありません。棚と棚の間の明確な通路だけ書いてもらえれば十分です。
-- 壁は見取り図の外周や間仕切りの線に沿って、細長い矩形として表現してください。
 - 座標は画像の見た目どおりの位置にしてください。実物の縮尺や角度の補正は不要です。
 - 見取り図に写っていない要素は書かないでください。
 - 必ず指定された JSON 形式だけで答えてください。`

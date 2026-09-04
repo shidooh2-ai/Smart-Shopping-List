@@ -32,6 +32,11 @@ export interface MapViewProps {
   backgroundImage?: string
   /** 背景画像の不透明度 0..1 */
   backgroundOpacity?: number
+  /**
+   * 棚・壁・設備など、生成/編集したマップ側の不透明度 0..1。
+   * 背景画像と見比べられるよう、背景画像の透明度とは別に下げられるようにする。
+   */
+  overlayOpacity?: number
 }
 
 interface Pointer {
@@ -61,6 +66,7 @@ export function MapView({
   height = 320,
   backgroundImage,
   backgroundOpacity = 0.35,
+  overlayOpacity = 1,
 }: MapViewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pointers = useRef(new Map<number, Pointer>())
@@ -322,6 +328,7 @@ export function MapView({
             />
           )}
 
+          <g opacity={overlayOpacity}>
           {floor.cells.map((cell, i) => {
             const x = (i % floor.width) * CELL
             const y = Math.floor(i / floor.width) * CELL
@@ -398,6 +405,7 @@ export function MapView({
               </text>
             )
           })}
+          </g>
 
           {routeSegments.map((pts, i) => (
             <polyline

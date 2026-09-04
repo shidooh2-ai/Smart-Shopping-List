@@ -26,10 +26,9 @@ describe('pickGridSize', () => {
 describe('rasterizeFloorPlan', () => {
   const floorId = newId('floor')
 
-  it('壁・棚・通路・設備を正しいマスに焼き込む', () => {
+  it('棚・通路・設備を正しいマスに焼き込み、それ以外は通路のままにする', () => {
     const result: FloorPlanResult = {
       zones: [
-        { kind: 'wall', x0: 0, y0: 0, x1: 1, y1: 0.05 },
         { kind: 'shelf', x0: 0.1, y0: 0.2, x1: 0.4, y1: 0.4, label: 'キャベツ' },
         { kind: 'entrance', x0: 0.45, y0: 0.9, x1: 0.55, y1: 1 },
       ],
@@ -39,8 +38,8 @@ describe('rasterizeFloorPlan', () => {
     expect(floor.height).toBe(10)
     expect(floor.cells).toHaveLength(100)
 
-    // 壁の帯
-    expect(floor.cells[0].k).toBe('wall')
+    // AIはもう壁を判定しない — 何も指定されていないマスは通路のまま (ルートが必ず通る)
+    expect(floor.cells[0].k).toBe('aisle')
     // 棚
     const shelfCellIdx = 3 * 10 + 2
     expect(floor.cells[shelfCellIdx].k).toBe('shelf')

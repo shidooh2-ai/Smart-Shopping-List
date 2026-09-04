@@ -5,6 +5,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
+import { fileToBackgroundImage } from '../lib/aiFloorPlan'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
 import { NODE_STYLE } from '../lib/mapStyle'
@@ -76,7 +77,10 @@ export function MapScreen() {
   const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [catPicker, setCatPicker] = useState(false)
   const [aiSheet, setAiSheet] = useState(false)
+  /** 背景画像と見比べるための、生成/編集したマップ側の一時的な不透明度 (保存はしない) */
+  const [mapOverlayOpacity, setMapOverlayOpacity] = useState(1)
   const shelfRef = useRef<string | null>(null)
+  const bgFileRef = useRef<HTMLInputElement | null>(null)
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
@@ -163,6 +167,15 @@ export function MapScreen() {
     else if (cell.k === 'node') setNodeSheet(cell.nodeId)
   }
 
+  const pickBackgroundImage = async (file: File) => {
+    try {
+      const dataUrl = await fileToBackgroundImage(file)
+      updateFloor(store.id, floor.id, { backgroundImage: dataUrl, backgroundOpacity: floor.backgroundOpacity ?? 0.35 })
+    } catch (e) {
+      window.alert(`画像を読み込めませんでした: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   return (
     <div className="screen">
       <div className="card">
@@ -207,10 +220,24 @@ export function MapScreen() {
           >
             📷 見取り図から作成
           </button>
+          <button type="button" onClick={() => bgFileRef.current?.click()}>
+            🖼 背景画像を設定
+          </button>
           <button type="button" onClick={() => setFloorSheet(true)}>
             ⚙ {floor.name}の設定
           </button>
         </div>
+        <input
+          ref={bgFileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void pickBackgroundImage(f)
+            e.target.value = ''
+          }}
+        />
 
         <MapView
           store={store}
@@ -224,32 +251,49 @@ export function MapScreen() {
           height={420}
           backgroundImage={floor.backgroundImage}
           backgroundOpacity={floor.backgroundOpacity ?? 0.35}
+          overlayOpacity={floor.backgroundImage ? mapOverlayOpacity : 1}
         />
 
         {floor.backgroundImage && (
-          <div className="row" style={{ marginTop: 10 }}>
-            <span className="muted">背景画像の透明度</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round((floor.backgroundOpacity ?? 0.35) * 100)}
-              onChange={(e) =>
-                updateFloor(store.id, floor.id, { backgroundOpacity: Number(e.target.value) / 100 })
-              }
-              style={{ flex: 1 }}
-            />
-            <span className="muted" style={{ minWidth: 36, textAlign: 'right' }}>
-              {Math.round((floor.backgroundOpacity ?? 0.35) * 100)}%
-            </span>
-            <button
-              type="button"
-              className="btn slim"
-              onClick={() => updateFloor(store.id, floor.id, { backgroundImage: null })}
-            >
-              背景を削除
-            </button>
-          </div>
+          <>
+            <div className="row" style={{ marginTop: 10 }}>
+              <span className="muted">背景画像の透明度</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((floor.backgroundOpacity ?? 0.35) * 100)}
+                onChange={(e) =>
+                  updateFloor(store.id, floor.id, { backgroundOpacity: Number(e.target.value) / 100 })
+                }
+                style={{ flex: 1 }}
+              />
+              <span className="muted" style={{ minWidth: 36, textAlign: 'right' }}>
+                {Math.round((floor.backgroundOpacity ?? 0.35) * 100)}%
+              </span>
+              <button
+                type="button"
+                className="btn slim"
+                onClick={() => updateFloor(store.id, floor.id, { backgroundImage: null })}
+              >
+                背景を削除
+              </button>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="muted">マップの不透明度（背景と見比べる）</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(mapOverlayOpacity * 100)}
+                onChange={(e) => setMapOverlayOpacity(Number(e.target.value) / 100)}
+                style={{ flex: 1 }}
+              />
+              <span className="muted" style={{ minWidth: 36, textAlign: 'right' }}>
+                {Math.round(mapOverlayOpacity * 100)}%
+              </span>
+            </div>
+          </>
         )}
 
         <p className="muted" style={{ margin: '8px 0 0' }}>

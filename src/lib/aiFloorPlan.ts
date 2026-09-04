@@ -22,7 +22,14 @@ export function setStoredApiKey(key: string): void {
   }
 }
 
-export const ZONE_KINDS = ['wall', 'shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
+/**
+ * AIに判定させる区画の種類。
+ * 「壁」は含めない — 見取り図の写真は棚同士の間隔や通路が判別しづらいことが多く、
+ * AIが壁を広めに判定すると通路まで壁扱いになってルートが作れなくなっていたため。
+ * マス目は最初からすべて通路 (aisle) として作り、そこに商品棚を置いていく方式にして、
+ * 生成直後から必ず通行可能な状態になるようにする (壁は手動編集ツールで後から追加できる)。
+ */
+export const ZONE_KINDS = ['shelf', 'aisle', 'entrance', 'checkout', 'stairs', 'elevator'] as const
 export type ZoneKind = (typeof ZONE_KINDS)[number]
 
 export interface FloorPlanZone {
@@ -94,10 +101,10 @@ export function rasterizeFloorPlan(
     const [x0, x1] = toCellRange(zone.x0, zone.x1, gridWidth)
     const [y0, y1] = toCellRange(zone.y0, zone.y1, gridHeight)
 
-    if (zone.kind === 'wall' || zone.kind === 'aisle') {
+    if (zone.kind === 'aisle') {
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
-          cells[y * gridWidth + x] = { k: zone.kind === 'wall' ? 'wall' : 'aisle' }
+          cells[y * gridWidth + x] = { k: 'aisle' }
         }
       }
       continue
