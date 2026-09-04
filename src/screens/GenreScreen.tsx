@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
-import { groupCategories, hasChildren } from '../lib/categoryTree'
 import { buildIndex, detectCategory } from '../lib/genre'
 import { useAppStore } from '../store/useAppStore'
 import type { Category } from '../types'
@@ -36,9 +35,6 @@ export function GenreScreen() {
 
   const target: Category | null = editing ? (categories.find((c) => c.id === editing) ?? null) : null
   const aliasEntries = Object.entries(aliases)
-  const groups = useMemo(() => groupCategories(categories), [categories])
-  const targetHasChildren = target ? hasChildren(target.id, categories) : false
-  const parentOptions = target ? categories.filter((c) => !c.parentId && c.id !== target.id) : []
 
   const exportData = () => {
     const payload = JSON.stringify(
@@ -132,33 +128,20 @@ export function GenreScreen() {
           </button>
         </div>
         <ul className="list-rows">
-          {groups.flatMap(({ parent, children }) => [
-            <li key={parent.id}>
+          {categories.map((c) => (
+            <li key={c.id}>
               <span
-                style={{ width: 30, height: 30, borderRadius: '50%', background: parent.color, flex: 'none' }}
+                style={{ width: 30, height: 30, borderRadius: '50%', background: c.color, flex: 'none' }}
               />
               <span className="grow">
-                <span className="title">{parent.name}</span>
-                <span className="muted">語彙 {parent.keywords.length} 語</span>
+                <span className="title">{c.name}</span>
+                <span className="muted">語彙 {c.keywords.length} 語</span>
               </span>
-              <button type="button" className="btn slim accent" onClick={() => setEditing(parent.id)}>
+              <button type="button" className="btn slim accent" onClick={() => setEditing(c.id)}>
                 編集
               </button>
-            </li>,
-            ...children.map((c) => (
-              <li key={c.id} style={{ paddingLeft: 24 }}>
-                <span className="muted">└</span>
-                <span style={{ width: 24, height: 24, borderRadius: '50%', background: c.color, flex: 'none' }} />
-                <span className="grow">
-                  <span className="title">{c.name}</span>
-                  <span className="muted">語彙 {c.keywords.length} 語</span>
-                </span>
-                <button type="button" className="btn slim accent" onClick={() => setEditing(c.id)}>
-                  編集
-                </button>
-              </li>
-            )),
-          ])}
+            </li>
+          ))}
         </ul>
       </div>
 
@@ -240,27 +223,6 @@ export function GenreScreen() {
                 />
               ))}
             </div>
-
-            {targetHasChildren ? (
-              <p className="muted" style={{ marginTop: 0 }}>
-                このジャンルはサブジャンルの親になっているため、他のジャンルの子には設定できません。
-              </p>
-            ) : (
-              <label className="field">
-                <span>親ジャンル（サブジャンルにする場合）</span>
-                <select
-                  value={target.parentId ?? ''}
-                  onChange={(e) => updateCategory(target.id, { parentId: e.target.value || undefined })}
-                >
-                  <option value="">（なし・独立したジャンル）</option>
-                  {parentOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
 
             <span className="muted">判定に使う語彙（{target.keywords.length}）</span>
             <div className="row" style={{ margin: '6px 0 8px' }}>

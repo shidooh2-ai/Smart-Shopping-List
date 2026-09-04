@@ -1,4 +1,4 @@
-import type { Category, Pos, RouteLeg, RoutePlan, RoutePreference, RouteStop, ShoppingItem, StoreMap } from '../types'
+import type { Pos, RouteLeg, RoutePlan, RoutePreference, RouteStop, ShoppingItem, StoreMap } from '../types'
 import { getFloor, nodePos, posKey, shelfAccessCells, shelfCells } from './grid'
 import { type Distances, type Graph, buildGraph, dijkstra, reconstructPath } from './pathfind'
 
@@ -34,7 +34,6 @@ const emptyPlan = (): RoutePlan => ({
  *
  * 1. 未チェックの品目をジャンルごとにまとめる
  * 2. ジャンルを取り扱う棚の「前に立てるマス」を候補地点にする
- *    (そのジャンル自体を扱う棚が無くても、親ジャンルを扱う棚があればそれを使う)
  * 3. 入口→各ジャンル(1棚選択)→レジ を最短で回る順序を解く
  *    (集合TSP。12ジャンル以下は厳密解、それ以上は最近傍法+2-opt)
  */
@@ -42,7 +41,6 @@ export function planRoute(
   map: StoreMap,
   items: ShoppingItem[],
   preference: RoutePreference = 'balanced',
-  categories: Category[] = [],
 ): RoutePlan {
   const plan = emptyPlan()
   // ジャンル未設定の警告は「今から買う必要があるもの」だけを対象にする (チェック済みは対象外)。
@@ -93,16 +91,9 @@ export function planRoute(
       ? checkoutPositions.map((p) => addSource(graph.index.get(posKey(p))!))
       : [null]
 
-  const categoryById = new Map(categories.map((c) => [c.id, c]))
-
   const groups: Group[] = []
   for (const [categoryId, itemIds] of byCategory) {
-    let shelves = map.shelves.filter((s) => s.categoryIds.includes(categoryId))
-    if (shelves.length === 0) {
-      // このジャンル自体を扱う棚が無ければ、親ジャンル (サブジャンルの場合) を扱う棚で代用する
-      const parentId = categoryById.get(categoryId)?.parentId
-      if (parentId) shelves = map.shelves.filter((s) => s.categoryIds.includes(parentId))
-    }
+    const shelves = map.shelves.filter((s) => s.categoryIds.includes(categoryId))
     if (shelves.length === 0) {
       plan.missingCategoryIds.push(categoryId)
       continue

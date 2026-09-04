@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSampleStore } from '../data/sampleStore'
-import type { Category, ShoppingItem, StoreMap } from '../types'
+import type { ShoppingItem, StoreMap } from '../types'
 import { newId } from './id'
 import { buildStoreFromAscii } from './layout'
 import { buildGraph, dijkstra } from './pathfind'
@@ -177,53 +177,6 @@ describe('planRoute', () => {
     const unknown = item('なぞの品', null)
     const plan = planRoute(map, [item('牛乳', 'dairy'), unknown])
     expect(plan.unresolvedItemIds).toEqual([unknown.id])
-  })
-
-  describe('サブジャンル (親ジャンルの棚へのフォールバック)', () => {
-    const categories: Category[] = [
-      { id: 'veg', name: '野菜', color: '#000', keywords: [] },
-      { id: 'root-veg', name: '根菜', color: '#000', keywords: [], parentId: 'veg' },
-    ]
-
-    const mapWithParentShelfOnly = () =>
-      buildStoreFromAscii('t', [
-        {
-          name: '1F', level: 1,
-          rows: ['#######', '#E...C#', '#.a...#', '#######'],
-          shelves: { a: { name: '野菜コーナー', categoryIds: ['veg'] } },
-          nodes: { E: { kind: 'entrance', name: '入口' }, C: { kind: 'checkout', name: 'レジ' } },
-        },
-      ])
-
-    it('子ジャンル専用の棚が無くても、親ジャンルの棚があればルートに含める', () => {
-      const map = mapWithParentShelfOnly()
-      const plan = planRoute(map, [item('にんじん', 'root-veg')], 'balanced', categories)
-      expect(plan.missingCategoryIds).toHaveLength(0)
-      expect(plan.stops).toHaveLength(1)
-      expect(plan.stops[0].shelfNames).toEqual(['野菜コーナー'])
-    })
-
-    it('子ジャンル専用の棚があれば、そちらを優先する', () => {
-      const map = buildStoreFromAscii('t', [
-        {
-          name: '1F', level: 1,
-          rows: ['#########', '#E.....C#', '#.a...b.#', '#########'],
-          shelves: {
-            a: { name: '野菜コーナー', categoryIds: ['veg'] },
-            b: { name: '根菜コーナー', categoryIds: ['root-veg'] },
-          },
-          nodes: { E: { kind: 'entrance', name: '入口' }, C: { kind: 'checkout', name: 'レジ' } },
-        },
-      ])
-      const plan = planRoute(map, [item('にんじん', 'root-veg')], 'balanced', categories)
-      expect(plan.stops[0].shelfNames).toEqual(['根菜コーナー'])
-    })
-
-    it('categoriesを渡さない場合はフォールバックしない (後方互換)', () => {
-      const map = mapWithParentShelfOnly()
-      const plan = planRoute(map, [item('にんじん', 'root-veg')])
-      expect(plan.missingCategoryIds).toEqual(['root-veg'])
-    })
   })
 
   it('売り場が無いジャンルを報告する', () => {

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { groupCategories } from '../lib/categoryTree'
 import { normalize } from '../lib/normalize'
 import type { Category } from '../types'
 import { Sheet } from './Sheet'
@@ -29,10 +28,9 @@ export function CategoryPicker({
 }: CategoryPickerProps) {
   const [query, setQuery] = useState('')
 
-  const groups = useMemo(() => groupCategories(categories), [categories])
   const filtered = useMemo(() => {
     const q = normalize(query)
-    if (!q) return null
+    if (!q) return categories
     return categories.filter((c) => normalize(c.name).includes(q))
   }, [categories, query])
 
@@ -40,20 +38,6 @@ export function CategoryPicker({
     onToggle(categoryId)
     if (!multiple) onClose()
   }
-
-  const renderButton = (c: Category, indent = false) => (
-    <button
-      key={c.id}
-      type="button"
-      aria-pressed={selected.includes(c.id)}
-      onClick={() => pick(c.id)}
-      style={indent ? { paddingLeft: 20 } : undefined}
-    >
-      <span className="dot" style={{ background: c.color }} />
-      {indent && <span className="muted">└</span>}
-      {c.name}
-    </button>
-  )
 
   return (
     <Sheet open={open} title={title} onClose={onClose}>
@@ -74,14 +58,14 @@ export function CategoryPicker({
             未設定にする
           </button>
         )}
-        {filtered
-          ? filtered.map((c) => renderButton(c))
-          : groups.flatMap(({ parent, children }) => [
-              renderButton(parent),
-              ...children.map((c) => renderButton(c, true)),
-            ])}
+        {filtered.map((c) => (
+          <button key={c.id} type="button" aria-pressed={selected.includes(c.id)} onClick={() => pick(c.id)}>
+            <span className="dot" style={{ background: c.color }} />
+            {c.name}
+          </button>
+        ))}
       </div>
-      {filtered && filtered.length === 0 && <p className="muted">見つかりませんでした。</p>}
+      {filtered.length === 0 && <p className="muted">見つかりませんでした。</p>}
     </Sheet>
   )
 }

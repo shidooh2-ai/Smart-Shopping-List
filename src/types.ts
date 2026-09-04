@@ -61,11 +61,6 @@ export interface Category {
   /** ジャンル特定に使う語彙 */
   keywords: string[]
   builtin?: boolean
-  /**
-   * 親ジャンルのID (サブジャンルの場合)。2階層まで。
-   * 棚にはこのジャンル自身が未設定でも、親ジャンルが設定されていればルートに含められる。
-   */
-  parentId?: string | null
 }
 
 export interface ShoppingItem {

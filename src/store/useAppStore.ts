@@ -93,7 +93,7 @@ export interface AppState {
   deletePurchasedItem: (purchasedId: string) => void
 
   // --- ジャンル ---
-  addCategory: (name: string, color: string, parentId?: string) => string
+  addCategory: (name: string, color: string) => string
   updateCategory: (categoryId: string, patch: Partial<Omit<Category, 'id'>>) => void
   deleteCategory: (categoryId: string) => void
   resetCategories: () => void
@@ -469,9 +469,9 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ purchased: s.purchased.filter((p) => p.id !== purchasedId) })),
 
       // --- ジャンル ---
-      addCategory: (name, color, parentId) => {
+      addCategory: (name, color) => {
         const id = newId('cat')
-        set((s) => ({ categories: [...s.categories, { id, name, color, keywords: [], parentId }] }))
+        set((s) => ({ categories: [...s.categories, { id, name, color, keywords: [] }] }))
         return id
       },
 
@@ -482,10 +482,7 @@ export const useAppStore = create<AppState>()(
 
       deleteCategory: (categoryId) =>
         set((s) => ({
-          categories: s.categories
-            .filter((c) => c.id !== categoryId)
-            // 親を削除した場合、子は迷子にせず独立ジャンルに昇格させる
-            .map((c) => (c.parentId === categoryId ? { ...c, parentId: undefined } : c)),
+          categories: s.categories.filter((c) => c.id !== categoryId),
           // 参照が残らないよう、棚と品目からも外す
           stores: s.stores.map((st) => ({
             ...st,
