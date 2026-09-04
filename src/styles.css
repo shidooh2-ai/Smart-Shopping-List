@@ -908,3 +908,27 @@ label.field > span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.settings-row .title {
+  font-weight: 600;
+  display: block;
+}
+
+.settings-row .muted {
+  display: block;
+  margin-top: 2px;
+}
+
+.settings-row input[type='checkbox'] {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  accent-color: var(--accent);
+}

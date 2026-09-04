@@ -22,7 +22,7 @@ import type {
   StoreMap,
 } from '../types'
 
-export type Tab = 'list' | 'route' | 'map' | 'genre'
+export type Tab = 'list' | 'route' | 'map' | 'genre' | 'settings'
 
 export type PaintTool =
   | { kind: 'aisle' }
@@ -45,6 +45,10 @@ export interface AppState {
   tab: Tab
   /** 階をまたぐルート計算で階段/エレベーターのどちらを優先するか */
   routePreference: RoutePreference
+  /** 自分のニックネーム。品目に「追加した人」として記録される (リスト共有時に使う) */
+  nickname: string
+  /** 画面ロック (自動スリープ) を無効化するか */
+  screenWakeLockEnabled: boolean
   /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
   mapHistory: Record<string, StoreMap[]>
   /** storeId ごとの「やり直す」用スナップショット (元に戻す操作で積む)。保存はしない */
@@ -52,6 +56,8 @@ export interface AppState {
 
   setTab: (tab: Tab) => void
   setRoutePreference: (preference: RoutePreference) => void
+  setNickname: (nickname: string) => void
+  setScreenWakeLockEnabled: (enabled: boolean) => void
 
   // --- 買い物リスト ---
   createList: (name?: string) => string
@@ -122,7 +128,9 @@ export interface AppState {
   redoMap: (storeId: string) => void
   cleanupMap: (storeId: string) => void
 
-  replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases' | 'purchased'>>) => void
+  replaceAll: (
+    data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases' | 'purchased' | 'nickname'>>,
+  ) => void
 
   // --- iCloud共有 (iPhoneアプリのみ) ---
   /** 店舗マップをiCloud経由で共有する (標準の共有シートが開く) */
@@ -159,6 +167,8 @@ function initialState() {
     activeListId: list.id,
     tab: 'list' as Tab,
     routePreference: 'balanced' as RoutePreference,
+    nickname: '',
+    screenWakeLockEnabled: false,
     mapHistory: {} as Record<string, StoreMap[]>,
     mapRedo: {} as Record<string, StoreMap[]>,
   }
@@ -260,6 +270,8 @@ export const useAppStore = create<AppState>()(
 
       setTab: (tab) => set({ tab }),
       setRoutePreference: (routePreference) => set({ routePreference }),
+      setNickname: (nickname) => set({ nickname }),
+      setScreenWakeLockEnabled: (screenWakeLockEnabled) => set({ screenWakeLockEnabled }),
 
       // --- 買い物リスト ---
       createList: (name) => {
@@ -288,6 +300,7 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const index = buildIndex(s.categories)
           const now = Date.now()
+          const addedBy = s.nickname.trim() || null
           const created: ShoppingItem[] = splitItems(text).map((raw, i) => {
             const match = detectCategory(raw, s.categories, s.aliases, index)
             return {
@@ -298,6 +311,7 @@ export const useAppStore = create<AppState>()(
               manual: false,
               confidence: match?.score ?? 0,
               createdAt: now + i,
+              addedBy,
             }
           })
           if (created.length === 0) return {}
@@ -412,6 +426,7 @@ export const useAppStore = create<AppState>()(
             categoryId: i.categoryId,
             purchasedAt: now,
             listName: list.name,
+            addedBy: i.addedBy ?? null,
           }))
           return {
             purchased: [...s.purchased, ...newlyPurchased],
@@ -744,6 +759,7 @@ export const useAppStore = create<AppState>()(
             categories: data.categories ?? s.categories,
             aliases: data.aliases ?? s.aliases,
             purchased: data.purchased ?? s.purchased,
+            nickname: data.nickname ?? s.nickname,
             activeListId: lists.some((l) => l.id === s.activeListId) ? s.activeListId : (lists[0]?.id ?? null),
           }
         }),
@@ -837,7 +853,7 @@ export const useAppStore = create<AppState>()(
       name: 'smart-shopping-list',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: ({ stores, lists, categories, aliases, activeListId, routePreference, purchased }) => ({
+      partialize: ({
         stores,
         lists,
         categories,
@@ -845,6 +861,18 @@ export const useAppStore = create<AppState>()(
         activeListId,
         routePreference,
         purchased,
+        nickname,
+        screenWakeLockEnabled,
+      }) => ({
+        stores,
+        lists,
+        categories,
+        aliases,
+        activeListId,
+        routePreference,
+        purchased,
+        nickname,
+        screenWakeLockEnabled,
       }),
     },
   ),

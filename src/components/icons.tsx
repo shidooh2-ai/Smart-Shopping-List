@@ -42,3 +42,12 @@ export function GenreGlyph({ size = 22, color = 'currentColor', strokeWidth = 2.
     </svg>
   )
 }
+
+export function SettingsGlyph({ size = 22, color = 'currentColor', strokeWidth = 2.1 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3.5v2.4M12 18.1v2.4M4.6 7.2l2.1 1.2M17.3 15.6l2.1 1.2M4.6 16.8l2.1-1.2M17.3 8.4l2.1-1.2M3.5 12h2.4M18.1 12h2.4" />
+    </svg>
+  )
+}

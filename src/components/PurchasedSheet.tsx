@@ -88,6 +88,7 @@ export function PurchasedSheet({ open, onClose, categories }: PurchasedSheetProp
                           <span className="muted">
                             {category?.name ?? 'ジャンル未設定'}
                             {p.listName ? ` ・ ${p.listName}` : ''}
+                            {p.addedBy ? ` ・ 追加: ${p.addedBy}` : ''}
                           </span>
                         </span>
                         <input

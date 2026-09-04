@@ -73,6 +73,8 @@ export interface ShoppingItem {
   /** 自動判定の確信度 0..1 */
   confidence: number
   createdAt: number
+  /** この品目を追加したユーザーのニックネーム (未設定なら null) */
+  addedBy?: string | null
 }
 
 export interface ShoppingList {
@@ -94,6 +96,8 @@ export interface PurchasedItem {
   purchasedAt: number
   /** 購入元のリスト名 (参考表示用のスナップショット。リストが削除・改名されても残る) */
   listName: string | null
+  /** この品目を追加したユーザーのニックネーム (未設定なら null) */
+  addedBy?: string | null
 }
 
 /** iCloud (CloudKit) 共有への紐付け情報。iPhoneアプリ (Capacitor) でのみ使う */

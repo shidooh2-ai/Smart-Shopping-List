@@ -350,6 +350,11 @@ function ItemRow({ item, category, onToggle, onRename, onRemove, onPickCategory 
         >
           {category ? category.name : 'ジャンル未設定'}
         </button>
+        {item.addedBy && (
+          <span className="muted" style={{ marginLeft: 8 }}>
+            追加: {item.addedBy}
+          </span>
+        )}
       </div>
       <input
         className="check"
