@@ -14,6 +14,7 @@ import type {
   Floor,
   MapNode,
   NodeKind,
+  PurchasedItem,
   RoutePreference,
   Shelf,
   ShoppingItem,
@@ -36,6 +37,8 @@ export interface AppState {
   stores: StoreMap[]
   lists: ShoppingList[]
   categories: Category[]
+  /** リストから購入済みに移した品目 (日付ごとに確認できる履歴)。全リスト共通 */
+  purchased: PurchasedItem[]
   /** 正規化テキスト -> ジャンルID。手動指定から学習する */
   aliases: Record<string, string>
   activeListId: string | null
@@ -65,6 +68,11 @@ export interface AppState {
   clearChecked: (listId: string) => void
   uncheckAll: (listId: string) => void
   redetectCategories: (listId: string) => void
+  /** チェック済みの品目を購入済みリストへ移す (対象リストからは削除される) */
+  markPurchased: (listId: string, itemIds: string[]) => void
+  /** 購入済み品目の日付を編集する */
+  updatePurchasedDate: (purchasedId: string, purchasedAt: number) => void
+  deletePurchasedItem: (purchasedId: string) => void
 
   // --- ジャンル ---
   addCategory: (name: string, color: string) => string
@@ -114,7 +122,7 @@ export interface AppState {
   redoMap: (storeId: string) => void
   cleanupMap: (storeId: string) => void
 
-  replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases'>>) => void
+  replaceAll: (data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases' | 'purchased'>>) => void
 
   // --- iCloud共有 (iPhoneアプリのみ) ---
   /** 店舗マップをiCloud経由で共有する (標準の共有シートが開く) */
@@ -146,6 +154,7 @@ function initialState() {
     stores: [store],
     lists: [list],
     categories: cloneDefaultCategories(),
+    purchased: [] as PurchasedItem[],
     aliases: {} as Record<string, string>,
     activeListId: list.id,
     tab: 'list' as Tab,
@@ -388,6 +397,38 @@ export const useAppStore = create<AppState>()(
             })),
           }
         }),
+
+      markPurchased: (listId, itemIds) =>
+        set((s) => {
+          const list = s.lists.find((l) => l.id === listId)
+          if (!list) return {}
+          const idSet = new Set(itemIds)
+          const moving = list.items.filter((i) => idSet.has(i.id))
+          if (moving.length === 0) return {}
+          const now = Date.now()
+          const newlyPurchased: PurchasedItem[] = moving.map((i) => ({
+            id: newId('purchased'),
+            text: i.text,
+            categoryId: i.categoryId,
+            purchasedAt: now,
+            listName: list.name,
+          }))
+          return {
+            purchased: [...s.purchased, ...newlyPurchased],
+            lists: mapList(s.lists, listId, (l) => ({
+              ...l,
+              items: l.items.filter((i) => !idSet.has(i.id)),
+            })),
+          }
+        }),
+
+      updatePurchasedDate: (purchasedId, purchasedAt) =>
+        set((s) => ({
+          purchased: s.purchased.map((p) => (p.id === purchasedId ? { ...p, purchasedAt } : p)),
+        })),
+
+      deletePurchasedItem: (purchasedId) =>
+        set((s) => ({ purchased: s.purchased.filter((p) => p.id !== purchasedId) })),
 
       // --- ジャンル ---
       addCategory: (name, color) => {
@@ -702,6 +743,7 @@ export const useAppStore = create<AppState>()(
             lists,
             categories: data.categories ?? s.categories,
             aliases: data.aliases ?? s.aliases,
+            purchased: data.purchased ?? s.purchased,
             activeListId: lists.some((l) => l.id === s.activeListId) ? s.activeListId : (lists[0]?.id ?? null),
           }
         }),
@@ -795,13 +837,14 @@ export const useAppStore = create<AppState>()(
       name: 'smart-shopping-list',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: ({ stores, lists, categories, aliases, activeListId, routePreference }) => ({
+      partialize: ({ stores, lists, categories, aliases, activeListId, routePreference, purchased }) => ({
         stores,
         lists,
         categories,
         aliases,
         activeListId,
         routePreference,
+        purchased,
       }),
     },
   ),

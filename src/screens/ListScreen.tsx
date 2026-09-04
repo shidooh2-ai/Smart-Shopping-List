@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { AddStoreSheet } from '../components/AddStoreSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
+import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, ShoppingItem } from '../types'
@@ -20,6 +21,7 @@ export function ListScreen() {
     clearChecked,
     uncheckAll,
     redetectCategories,
+    markPurchased,
     setListStore,
     createList,
     deleteList,
@@ -37,6 +39,7 @@ export function ListScreen() {
   const [pickerItem, setPickerItem] = useState<string | null>(null)
   const [listSheet, setListSheet] = useState(false)
   const [addStoreSheet, setAddStoreSheet] = useState(false)
+  const [purchasedSheet, setPurchasedSheet] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -64,6 +67,7 @@ export function ListScreen() {
 
   const remaining = list.items.filter((i) => !i.checked).length
   const unresolved = list.items.filter((i) => !i.checked && !i.categoryId).length
+  const checkedCount = list.items.length - remaining
 
   const groups = useMemo(() => {
     if (!grouped) return [{ category: null as Category | null, items: list.items }]
@@ -84,6 +88,9 @@ export function ListScreen() {
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
           <strong style={{ flex: 1, minWidth: 0 }}>{list.name}</strong>
+          <button type="button" className="btn slim" onClick={() => setPurchasedSheet(true)}>
+            🧾 購入済み
+          </button>
           <button type="button" className="btn slim" onClick={() => setListSheet(true)}>
             リスト管理
           </button>
@@ -217,12 +224,27 @@ export function ListScreen() {
             <button type="button" className="btn slim" onClick={() => uncheckAll(list.id)}>
               チェックを全部外す
             </button>
-            <button type="button" className="btn slim danger" onClick={() => clearChecked(list.id)}>
-              購入済みを削除
+            <button
+              type="button"
+              className="btn slim"
+              disabled={checkedCount === 0}
+              onClick={() => markPurchased(list.id, list.items.filter((i) => i.checked).map((i) => i.id))}
+            >
+              まとめて購入済みにする
+            </button>
+            <button
+              type="button"
+              className="btn slim danger"
+              disabled={checkedCount === 0}
+              onClick={() => clearChecked(list.id)}
+            >
+              まとめて削除
             </button>
           </div>
         </div>
       )}
+
+      <PurchasedSheet open={purchasedSheet} onClose={() => setPurchasedSheet(false)} categories={categories} />
 
       <CategoryPicker
         open={editing !== null && editing !== undefined}

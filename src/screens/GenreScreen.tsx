@@ -15,6 +15,7 @@ export function GenreScreen() {
   const aliases = useAppStore((s) => s.aliases)
   const stores = useAppStore((s) => s.stores)
   const lists = useAppStore((s) => s.lists)
+  const purchased = useAppStore((s) => s.purchased)
   const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias, replaceAll } = useAppStore()
 
   const [editing, setEditing] = useState<string | null>(null)
@@ -34,7 +35,16 @@ export function GenreScreen() {
 
   const exportData = () => {
     const payload = JSON.stringify(
-      { app: 'smart-shopping-list', version: 1, exportedAt: new Date().toISOString(), stores, lists, categories, aliases },
+      {
+        app: 'smart-shopping-list',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        stores,
+        lists,
+        categories,
+        aliases,
+        purchased,
+      },
       null,
       2,
     )
@@ -55,6 +65,7 @@ export function GenreScreen() {
         lists: Array.isArray(data.lists) ? data.lists : undefined,
         categories: Array.isArray(data.categories) ? data.categories : undefined,
         aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : undefined,
+        purchased: Array.isArray(data.purchased) ? data.purchased : undefined,
       })
       window.alert('読み込みました。')
     } catch (e) {

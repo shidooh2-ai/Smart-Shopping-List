@@ -243,6 +243,7 @@ button.btn:disabled {
 
 input[type='text'],
 input[type='number'],
+input[type='date'],
 select,
 textarea {
   width: 100%;
@@ -255,6 +256,7 @@ textarea {
 
 input[type='text']:focus-visible,
 input[type='number']:focus-visible,
+input[type='date']:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
@@ -519,6 +521,20 @@ label.field > span {
 
 .stop.done {
   opacity: 0.55;
+}
+
+.stop.checkout-btn {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.stop.checkout-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .stop .badge {

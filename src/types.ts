@@ -86,6 +86,16 @@ export interface ShoppingList {
   cloud?: CloudLink
 }
 
+export interface PurchasedItem {
+  id: string
+  text: string
+  categoryId: string | null
+  /** 購入日時。日付ごとのグルーピング表示に使う。ユーザーが後から編集できる */
+  purchasedAt: number
+  /** 購入元のリスト名 (参考表示用のスナップショット。リストが削除・改名されても残る) */
+  listName: string | null
+}
+
 /** iCloud (CloudKit) 共有への紐付け情報。iPhoneアプリ (Capacitor) でのみ使う */
 export interface CloudLink {
   /** CloudKitのレコード名 (recordName) */

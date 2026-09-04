@@ -16,6 +16,7 @@ export function RouteScreen() {
   const categories = useAppStore((s) => s.categories)
   const setTab = useAppStore((s) => s.setTab)
   const setItemChecked = useAppStore((s) => s.setItemChecked)
+  const markPurchased = useAppStore((s) => s.markPurchased)
   const routePreference = useAppStore((s) => s.routePreference)
   const setRoutePreference = useAppStore((s) => s.setRoutePreference)
   const [floorId, setFloorId] = useState<string | null>(null)
@@ -72,6 +73,14 @@ export function RouteScreen() {
   const hasStairs = store.nodes.some((n) => n.kind === 'stairs')
   const hasElevator = store.nodes.some((n) => n.kind === 'elevator')
   const showPreference = store.floors.length > 1 && hasStairs && hasElevator
+
+  const checkedItemIds = list.items.filter((i) => i.checked).map((i) => i.id)
+  const checkoutToPurchased = () => {
+    if (checkedItemIds.length === 0) return
+    if (window.confirm(`チェックした ${checkedItemIds.length} 件を購入済みにします。よろしいですか？`)) {
+      markPurchased(list.id, checkedItemIds)
+    }
+  }
 
   return (
     <div className="screen">
@@ -233,12 +242,22 @@ export function RouteScreen() {
               )
             })}
             {plan.goal && (
-              <div className="stop">
+              <button
+                type="button"
+                className="stop checkout-btn"
+                disabled={checkedItemIds.length === 0}
+                onClick={checkoutToPurchased}
+              >
                 <span className="badge" style={{ background: '#ef6c00' }}>
                   ⤷
                 </span>
-                <div className="where">レジへ</div>
-              </div>
+                <div className="where">
+                  レジへ
+                  {checkedItemIds.length > 0 && (
+                    <span className="muted"> ・ チェック済み{checkedItemIds.length}件を購入済みにする</span>
+                  )}
+                </div>
+              </button>
             )}
           </div>
         </>
