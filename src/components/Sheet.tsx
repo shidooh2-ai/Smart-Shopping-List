@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface SheetProps {
   open: boolean
@@ -59,7 +60,10 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
     ? { top: viewport.top, height: viewport.height }
     : {}
 
-  return (
+  // document.body直下にポータルで描画する。.app 内 (position:fixedのタブバーなど) に
+  // ネストしたままだと、実機のWebKitで祖先のスタッキングコンテキストの扱いが
+  // 期待通りにならず、z-indexを上げてもタブバーの裏に隠れることがあったため。
+  return createPortal(
     <div
       className="sheet-backdrop"
       style={backdropStyle}
@@ -77,6 +81,7 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
         <div className="content">{children}</div>
         {footer && <div className="sheet-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
