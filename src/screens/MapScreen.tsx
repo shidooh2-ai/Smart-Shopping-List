@@ -208,8 +208,15 @@ export function MapScreen() {
           <button type="button" onClick={() => setFloorId(addFloor(store.id))}>
             ＋階を追加
           </button>
+          <button type="button" onClick={() => setFloorSheet(true)}>
+            ⚙ {floor.name}の設定
+          </button>
+        </div>
+
+        <div className="row wrap" style={{ marginTop: 8 }}>
           <button
             type="button"
+            className="btn slim"
             onClick={() => {
               const hasContent = store.shelves.some((s) => s.floorId === floor.id) || floor.cells.some((c) => c.k !== 'aisle')
               if (
@@ -222,11 +229,8 @@ export function MapScreen() {
           >
             📷 見取り図から作成
           </button>
-          <button type="button" onClick={() => bgFileRef.current?.click()}>
+          <button type="button" className="btn slim" onClick={() => bgFileRef.current?.click()}>
             🖼 背景画像を設定
-          </button>
-          <button type="button" onClick={() => setFloorSheet(true)}>
-            ⚙ {floor.name}の設定
           </button>
         </div>
         <input

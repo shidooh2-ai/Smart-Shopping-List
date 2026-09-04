@@ -29,6 +29,17 @@ export function RouteScreen() {
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const itemById = useMemo(() => new Map((list?.items ?? []).map((i) => [i.id, i])), [list])
 
+  /** 立ち寄り先の品目が全部チェック済みなら「買い終わった」として薄く表示する (経路自体は変えない) */
+  const doneStopOrders = useMemo(() => {
+    const set = new Set<number>()
+    for (const stop of plan?.stops ?? []) {
+      if (stop.itemIds.length > 0 && stop.itemIds.every((id) => itemById.get(id)?.checked)) {
+        set.add(stop.order)
+      }
+    }
+    return set
+  }, [plan, itemById])
+
   if (!list) return <div className="screen"><div className="empty">リストがありません。</div></div>
 
   if (!store) {
@@ -157,6 +168,7 @@ export function RouteScreen() {
               categories={categories}
               plan={plan}
               activeStop={activeStop}
+              doneStopOrders={doneStopOrders}
               height={300}
             />
             <div className="legend">
@@ -182,7 +194,7 @@ export function RouteScreen() {
               return (
                 <div
                   key={stop.order}
-                  className={`stop${activeStop === stop.order ? ' active' : ''}`}
+                  className={`stop${activeStop === stop.order ? ' active' : ''}${doneStopOrders.has(stop.order) ? ' done' : ''}`}
                   onClick={() => {
                     setActiveStop(stop.order)
                     setFloorId(stop.pos.floorId)
@@ -232,7 +244,7 @@ export function RouteScreen() {
         </>
       ) : (
         <div className="empty">
-          {list.items.filter((i) => !i.checked).length === 0
+          {list.items.length === 0
             ? '買うものがありません。リストに追加してください。'
             : 'ルートを作れませんでした。マップに売り場（棚の取り扱いジャンル）が設定されているか確認してください。'}
         </div>

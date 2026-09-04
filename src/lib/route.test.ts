@@ -166,10 +166,10 @@ describe('planRoute', () => {
     expect(shelfOrder(map, [item('p', 'x')])).toEqual(['近い棚'])
   })
 
-  it('チェック済みの品目はルートに含めない', () => {
+  it('チェック済みの品目も含めてルートを組む (チェックしても消えたり再ルートされたりしない)', () => {
     const map = createSampleStore()
     const plan = planRoute(map, [item('牛乳', 'dairy'), item('ビール', 'alcohol', true)])
-    expect(plan.stops.flatMap((s) => s.categoryIds)).toEqual(['dairy'])
+    expect(plan.stops.flatMap((s) => s.categoryIds).sort()).toEqual(['alcohol', 'dairy'])
   })
 
   it('ジャンル未特定の品目を報告する', () => {

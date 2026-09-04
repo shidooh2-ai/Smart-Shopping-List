@@ -43,8 +43,9 @@ export function planRoute(
   preference: RoutePreference = 'balanced',
 ): RoutePlan {
   const plan = emptyPlan()
-  const active = items.filter((i) => !i.checked)
-  plan.unresolvedItemIds = active.filter((i) => !i.categoryId).map((i) => i.id)
+  // ジャンル未設定の警告は「今から買う必要があるもの」だけを対象にする (チェック済みは対象外)。
+  const unchecked = items.filter((i) => !i.checked)
+  plan.unresolvedItemIds = unchecked.filter((i) => !i.categoryId).map((i) => i.id)
 
   const graph = buildGraph(map, preference)
   if (graph.positions.length === 0) return plan
@@ -64,8 +65,10 @@ export function planRoute(
   }
 
   // --- ジャンルごとの候補地点 ---
+  // チェック済みの品目も含めてルートを組み立てる。チェックしてもリストから
+  // 消えたり経路が組み直されたりせず、表示だけ薄くする (RouteScreen側)。
   const byCategory = new Map<string, string[]>()
-  for (const item of active) {
+  for (const item of items) {
     if (!item.categoryId) continue
     const list = byCategory.get(item.categoryId) ?? []
     list.push(item.id)

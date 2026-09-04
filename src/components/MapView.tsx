@@ -11,6 +11,8 @@ export interface MapViewProps {
   plan?: RoutePlan | null
   /** 強調表示する立ち寄り番号 */
   activeStop?: number | null
+  /** 立ち寄り先の品目が全部チェック済みの立ち寄り番号。マーカーとルート線を薄く表示する */
+  doneStopOrders?: Set<number>
   /**
    * 塗りつぶし操作。指定するとドラッグで矩形を選び、指を離した時点で
    * まとめて塗る (未指定ならドラッグは地図の移動)。
@@ -51,6 +53,7 @@ interface CellPos {
 
 const MIN_SCALE = 0.6
 const MAX_SCALE = 6
+const EMPTY_DONE_SET: Set<number> = new Set()
 
 export function MapView({
   store,
@@ -58,6 +61,7 @@ export function MapView({
   categories,
   plan = null,
   activeStop = null,
+  doneStopOrders = EMPTY_DONE_SET,
   onPaint,
   paintMode = 'area',
   onTapCell,
@@ -126,6 +130,23 @@ export function MapView({
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
+
+    if (onPaint) {
+      // 配置ツール (選択ツール以外) では拡大縮小・移動を一切行わない。
+      // 塗り操作中に2本目以降の指が触れても無視し、ピンチ扱いにしない
+      // (実機で片手指1本のつもりでも余分なpointerイベントが入り、
+      //  誤ってピンチと判定されて操作不能になることがあったため)。
+      if (dragStart.current) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      moved.current = false
+      const cell = toCell(e.clientX, e.clientY)
+      if (cell) {
+        dragStart.current = cell
+        setDragCell(cell)
+      }
+      return
+    }
+
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     moved.current = false
     if (pointers.current.size === 2) {
@@ -135,17 +156,7 @@ export function MapView({
         cx: (a.x + b.x) / 2,
         cy: (a.y + b.y) / 2,
       }
-      // 2本目の指が触れたら塗り操作は取り消してズームに切り替える
-      dragStart.current = null
-      setDragCell(null)
       return
-    }
-    if (onPaint) {
-      const cell = toCell(e.clientX, e.clientY)
-      if (cell) {
-        dragStart.current = cell
-        setDragCell(cell)
-      }
     }
   }
 
@@ -153,6 +164,17 @@ export function MapView({
     const prev = pointers.current.get(e.pointerId)
     if (!prev) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    if (onPaint) {
+      // 配置ツールでは常に最初の指だけを塗り操作として追従させ、拡大縮小・移動はしない。
+      if (!dragStart.current) return
+      const dx = e.clientX - prev.x
+      const dy = e.clientY - prev.y
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) moved.current = true
+      const cell = toCell(e.clientX, e.clientY)
+      if (cell) setDragCell(cell)
+      return
+    }
 
     if (pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()]
@@ -186,14 +208,6 @@ export function MapView({
     const dx = e.clientX - prev.x
     const dy = e.clientY - prev.y
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) moved.current = true
-
-    if (onPaint && dragStart.current) {
-      const cell = toCell(e.clientX, e.clientY)
-      if (cell) setDragCell(cell)
-      return
-    }
-
-    if (onPaint) return
 
     const svg = svgRef.current
     if (!svg) return
@@ -271,12 +285,15 @@ export function MapView({
 
   const routeSegments = useMemo(() => {
     if (!plan) return []
-    const segs: string[] = []
-    for (const leg of plan.legs) {
+    const segs: Array<{ points: string; done: boolean }> = []
+    plan.legs.forEach((leg, i) => {
+      // legs[i] は stops[i] へ向かう区間 (立ち寄り先の品目が全部チェック済みなら薄く表示する)
+      const destStop = i < plan.stops.length ? plan.stops[i] : null
+      const done = destStop != null && doneStopOrders.has(destStop.order)
       let run: Pos[] = []
       const flush = () => {
         if (run.length >= 2) {
-          segs.push(run.map((p) => `${(p.x + 0.5) * CELL},${(p.y + 0.5) * CELL}`).join(' '))
+          segs.push({ points: run.map((p) => `${(p.x + 0.5) * CELL},${(p.y + 0.5) * CELL}`).join(' '), done })
         }
         run = []
       }
@@ -288,9 +305,9 @@ export function MapView({
         run.push(p)
       }
       flush()
-    }
+    })
     return segs
-  }, [plan, floor.id])
+  }, [plan, floor.id, doneStopOrders])
 
   const stopsHere = plan?.stops.filter((s) => s.pos.floorId === floor.id) ?? []
   const startHere = plan?.start && plan.start.floorId === floor.id ? plan.start : null
@@ -407,14 +424,14 @@ export function MapView({
           })}
           </g>
 
-          {routeSegments.map((pts, i) => (
+          {routeSegments.map((seg, i) => (
             <polyline
               key={i}
-              points={pts}
+              points={seg.points}
               fill="none"
               stroke="var(--accent)"
               strokeWidth={CELL * 0.28}
-              strokeOpacity={0.55}
+              strokeOpacity={seg.done ? 0.18 : 0.55}
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{ pointerEvents: 'none' }}
@@ -473,7 +490,7 @@ export function MapView({
           )}
 
           {stopsHere.map((s) => (
-            <g key={s.order} style={{ pointerEvents: 'none' }}>
+            <g key={s.order} opacity={doneStopOrders.has(s.order) ? 0.35 : 1} style={{ pointerEvents: 'none' }}>
               <circle
                 cx={(s.pos.x + 0.5) * CELL}
                 cy={(s.pos.y + 0.5) * CELL}
