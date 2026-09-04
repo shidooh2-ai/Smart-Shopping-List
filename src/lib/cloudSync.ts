@@ -49,8 +49,19 @@ export interface CloudSyncPluginApi {
   unshare(opts: UnshareOptions): Promise<{ stopped: boolean }>
   pull(): Promise<{ items: CloudSyncItem[] }>
   push(opts: PushOptions): Promise<{ pushed: boolean }>
+  /**
+   * 他の参加者の変更をプッシュ通知 (CKSubscription + APNsのサイレント通知) で知るための準備。
+   * リモート通知の登録とサブスクリプションの作成を行う。失敗しても例外は投げない
+   * (通知が届かないだけで、pull() ベースの同期自体には影響しない)。
+   */
+  enablePush(): Promise<{ enabled: boolean }>
   addListener(
     eventName: 'shareReceived',
+    listenerFunc: () => void,
+  ): Promise<{ remove: () => void }>
+  addListener(
+    /** サイレント通知でサーバー側の変更を検知したとき。中身は運ばないので、受け取ったら pull() し直す */
+    eventName: 'recordChanged',
     listenerFunc: () => void,
   ): Promise<{ remove: () => void }>
 }

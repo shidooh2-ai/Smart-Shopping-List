@@ -8,12 +8,16 @@ import type { ThemeId } from '../data/themes'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
 import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
+import { appendActivity, newActivitySince, summarizeItemTexts } from '../lib/listActivity'
+import { notifyListActivity } from '../lib/listActivityNotify'
 import { splitItems } from '../lib/normalize'
 import type {
   Category,
   Cell,
   CloudLink,
   Floor,
+  ListActivityEvent,
+  ListNotificationPrefs,
   ListReminder,
   MapNode,
   NodeKind,
@@ -77,6 +81,8 @@ export interface AppState {
   updateList: (listId: string, patch: { name?: string; color?: string }) => void
   /** リストのリマインダー設定を変更する (null で解除) */
   setListReminder: (listId: string, reminder: ListReminder | null) => void
+  /** 共有リストで他の人の変更 (追加/削除/購入済みへ移動) を通知するかどうか */
+  setListNotificationPrefs: (listId: string, prefs: ListNotificationPrefs) => void
   setActiveList: (listId: string) => void
   setListStore: (listId: string, storeId: string | null) => void
   addItems: (listId: string, text: string) => void
@@ -231,9 +237,13 @@ function patchCloud<T extends { id: string; cloud?: CloudLink }>(
   })
 }
 
-/** CloudKitへ送信するJSONには自分の cloud リンク情報 (recordIdなど) を含めない。 */
-function stripCloud<T extends { cloud?: CloudLink }>(entity: T): T {
-  const { cloud: _drop, ...rest } = entity
+/**
+ * CloudKitへ送信するJSONには含めないフィールドを取り除く。
+ * - cloud: 自分の端末での紐付け情報 (recordIdなど)
+ * - notifications: 通知を受け取るかどうかは端末ごとの好みなので、他の参加者には送らない
+ */
+function stripCloud<T extends { cloud?: CloudLink; notifications?: unknown }>(entity: T): T {
+  const { cloud: _drop, notifications: _dropNotif, ...rest } = entity
   return rest as T
 }
 
@@ -321,6 +331,11 @@ export const useAppStore = create<AppState>()(
           lists: mapList(s.lists, listId, (l) => ({ ...l, reminder: reminder ?? undefined })),
         })),
 
+      setListNotificationPrefs: (listId, prefs) =>
+        set((s) => ({
+          lists: mapList(s.lists, listId, (l) => ({ ...l, notifications: prefs })),
+        })),
+
       setActiveList: (listId) => set({ activeListId: listId }),
 
       setListStore: (listId, storeId) =>
@@ -345,7 +360,14 @@ export const useAppStore = create<AppState>()(
             }
           })
           if (created.length === 0) return {}
-          return { lists: mapList(s.lists, listId, (l) => ({ ...l, items: [...l.items, ...created] })) }
+          const summary = summarizeItemTexts(created.map((i) => i.text))
+          return {
+            lists: mapList(s.lists, listId, (l) => ({
+              ...l,
+              items: [...l.items, ...created],
+              activity: appendActivity(l.activity, 'add', summary, addedBy),
+            })),
+          }
         }),
 
       toggleItem: (listId, itemId) =>
@@ -365,9 +387,19 @@ export const useAppStore = create<AppState>()(
         })),
 
       removeItem: (listId, itemId) =>
-        set((s) => ({
-          lists: mapList(s.lists, listId, (l) => ({ ...l, items: l.items.filter((i) => i.id !== itemId) })),
-        })),
+        set((s) => {
+          const by = s.nickname.trim() || null
+          return {
+            lists: mapList(s.lists, listId, (l) => {
+              const removed = l.items.find((i) => i.id === itemId)
+              return {
+                ...l,
+                items: l.items.filter((i) => i.id !== itemId),
+                activity: removed ? appendActivity(l.activity, 'remove', removed.text, by) : l.activity,
+              }
+            }),
+          }
+        }),
 
       renameItem: (listId, itemId, text) =>
         set((s) => {
@@ -415,9 +447,20 @@ export const useAppStore = create<AppState>()(
         }),
 
       clearChecked: (listId) =>
-        set((s) => ({
-          lists: mapList(s.lists, listId, (l) => ({ ...l, items: l.items.filter((i) => !i.checked) })),
-        })),
+        set((s) => {
+          const by = s.nickname.trim() || null
+          return {
+            lists: mapList(s.lists, listId, (l) => {
+              const removed = l.items.filter((i) => i.checked)
+              if (removed.length === 0) return l
+              return {
+                ...l,
+                items: l.items.filter((i) => !i.checked),
+                activity: appendActivity(l.activity, 'remove', summarizeItemTexts(removed.map((i) => i.text)), by),
+              }
+            }),
+          }
+        }),
 
       uncheckAll: (listId) =>
         set((s) => ({
@@ -463,6 +506,12 @@ export const useAppStore = create<AppState>()(
             lists: mapList(s.lists, listId, (l) => ({
               ...l,
               items: l.items.filter((i) => !idSet.has(i.id)),
+              activity: appendActivity(
+                l.activity,
+                'purchase',
+                summarizeItemTexts(moving.map((i) => i.text)),
+                s.nickname.trim() || null,
+              ),
             })),
           }
         }),
@@ -849,18 +898,37 @@ export const useAppStore = create<AppState>()(
 
       pullCloudShares: async () => {
         const { items } = await CloudSync.pull()
+        // 通知は「他の参加者の変更」だけを対象にしたいので、merge で上書きされる前の
+        // ローカルの状態を先に読んでおく (自分の変更は既にローカルに反映済みなので混ざらない)。
+        const existingLists = get().lists
+        const pendingNotifications: Array<{ list: ShoppingList; events: ListActivityEvent[] }> = []
         set((s) => {
           let stores = s.stores
           let lists = s.lists
           for (const item of items) {
             if (item.kind === 'store') {
               stores = mergeCloudEntity(stores, item, (json) => JSON.parse(json) as StoreMap)
-            } else {
-              lists = mergeCloudEntity(lists, item, (json) => JSON.parse(json) as ShoppingList)
+              continue
+            }
+            const existing = existingLists.find((l) => l.cloud?.recordId === item.recordId)
+            lists = mergeCloudEntity(lists, item, (json) => JSON.parse(json) as ShoppingList)
+            // notifications は端末ローカルの好みなので、CloudKitのJSONには載っていない
+            // (stripCloudで除去済み)。mergeCloudEntity内部でも parse 結果に stripCloud を
+            // 通すため、parseコールバック側で戻しても消されてしまう — merge後に付け直す。
+            if (existing) {
+              lists = lists.map((l) => (l.id === existing.id ? { ...l, notifications: existing.notifications } : l))
+            }
+            if (existing && item.updatedAt > existing.updatedAt) {
+              const remote = JSON.parse(item.json) as ShoppingList
+              const newEvents = newActivitySince(existing.activity, remote.activity)
+              if (newEvents.length > 0) pendingNotifications.push({ list: existing, events: newEvents })
             }
           }
           return { stores, lists }
         })
+        for (const { list, events } of pendingNotifications) {
+          await notifyListActivity(list, events).catch(() => {})
+        }
       },
 
       pushCloudChanges: async () => {

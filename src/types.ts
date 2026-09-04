@@ -91,6 +91,32 @@ export interface ListReminder {
   weekdays?: number[]
 }
 
+/** 共有リストで他の人の変更を知らせる通知の種類 */
+export type ListActivityKind = 'add' | 'remove' | 'purchase'
+
+/** 共有リストの変更履歴。他デバイスからの pull で「まだ見ていない変更」を検出するのに使う */
+export interface ListActivityEvent {
+  /** 新規発行のID。この値で「既に知っている変更か」を判定する */
+  id: string
+  kind: ListActivityKind
+  /** 対象品目のテキスト (複数まとめての操作なら件数を含む説明文) */
+  itemText: string
+  /** 操作した人のニックネーム (未設定なら null) */
+  by: string | null
+  at: number
+}
+
+/**
+ * リストごとの通知の有効/無効。
+ * 端末ごとの好みなので同期はせず (CloudKitには送らない)、ローカルにだけ保存する。
+ * 未設定 (リストを共有した直後など) はすべて有効として扱う。
+ */
+export interface ListNotificationPrefs {
+  onAdd: boolean
+  onRemove: boolean
+  onPurchase: boolean
+}
+
 export interface ShoppingList {
   id: string
   name: string
@@ -104,6 +130,10 @@ export interface ShoppingList {
   updatedAt: number
   /** iCloud (CloudKit) 経由で共有中の場合の情報 */
   cloud?: CloudLink
+  /** 直近の変更履歴 (共有相手への通知の元ネタ)。件数は上限を設けて切り詰める */
+  activity?: ListActivityEvent[]
+  /** このリストの通知設定 (端末ローカル。CloudKitへは同期しない) */
+  notifications?: ListNotificationPrefs
 }
 
 export interface PurchasedItem {

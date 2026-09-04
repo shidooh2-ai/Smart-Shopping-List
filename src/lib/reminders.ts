@@ -19,8 +19,11 @@ export function isReminderSupported(): boolean {
   return Capacitor.isNativePlatform()
 }
 
-/** 文字列から安定した正の整数を作る (FNV-1a)。通知IDはリストIDから毎回同じ値を導く必要がある。 */
-function hashToInt(text: string): number {
+/**
+ * 文字列から安定した正の整数を作る (FNV-1a)。通知IDは元の文字列から毎回同じ値を導く必要がある。
+ * リマインダーだけでなく listActivityNotify.ts (共有リストの変更通知) でも使う汎用ヘルパー。
+ */
+export function hashToInt(text: string): number {
   let hash = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i)

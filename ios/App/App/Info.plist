@@ -33,6 +33,12 @@
 	<string>店内の見取り図を撮影して、マップを自動生成するために使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>店内の見取り図の画像を選択して、マップを自動生成するために使用します。</string>
+	<!-- 共有リストの変更をCKSubscriptionのサイレント通知で受け取るために必要。
+	     Push Notifications capability (Xcodeでの追加が必要、有料Developer Program前提) と対になる。 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

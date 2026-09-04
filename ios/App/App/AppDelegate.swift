@@ -43,6 +43,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 
+    /// リモート通知の登録が成功した (CloudSyncPlugin.enablePush() から呼ばれる)。
+    /// CKSubscription経由のサイレント通知はCloudKitのpush topicへ自動的に届くため、
+    /// 独自サーバーへトークンを送る必要は無い (ログのみ)。
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        CAPLog.print("AppDelegate: remote notifications registered")
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        CAPLog.print("AppDelegate: remote notification registration failed: \(error.localizedDescription)")
+    }
+
+    /// CKSubscriptionからのサイレント通知 (content-available) の受信。
+    /// 中身 (何が変わったか) は運ばれてこないので、CloudSyncPlugin側にだけ知らせて
+    /// JS の pullCloudShares() に差分検出とローカル通知を任せる。
+    ///
+    /// 注意: ここで即座に completionHandler(.newData) を呼んでいるのは、
+    /// JS側の非同期処理 (CloudKitへの問い合わせ→ローカル通知のスケジュール) の完了を
+    /// このハンドラで待ち合わせる仕組みを持たないため。OSのバックグラウンド実行時間の
+    /// 制約でこの処理が打ち切られるリスクを避けるための簡略化であり、フォアグラウンド
+    /// 復帰時の pullCloudShares() が最終的な取りこぼしの保険になる。
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard CKNotification(fromRemoteNotificationDictionary: userInfo) != nil else {
+            completionHandler(.noData)
+            return
+        }
+        NotificationCenter.default.post(name: .cloudKitRecordChanged, object: nil)
+        completionHandler(.newData)
+    }
+
     /// 他の人からiCloud共有 (店舗マップ・買い物リスト) の招待リンクを開いたときに呼ばれる。
     func application(_ application: UIApplication, userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata) {
         let container = CKContainer(identifier: cloudKitShareMetadata.containerIdentifier)

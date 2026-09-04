@@ -6,7 +6,7 @@ import { Sheet } from '../components/Sheet'
 import { PALETTE } from '../data/palette'
 import { WEEKDAY_LABELS, describeReminder, isReminderSupported } from '../lib/reminders'
 import { useActiveList, useAppStore } from '../store/useAppStore'
-import type { Category, CloudLink, ListReminder, ReminderRepeat, ShoppingItem } from '../types'
+import type { Category, CloudLink, ListNotificationPrefs, ListReminder, ReminderRepeat, ShoppingItem } from '../types'
 
 const REPEAT_OPTIONS: Array<{ id: ReminderRepeat; label: string }> = [
   { id: 'once', label: '1回だけ' },
@@ -38,6 +38,7 @@ export function ListScreen() {
     deleteList,
     updateList,
     setListReminder,
+    setListNotificationPrefs,
     setActiveList,
     shareList,
     unshareList,
@@ -309,12 +310,14 @@ export function ListScreen() {
                 initialColor={target.color ?? PALETTE[0]}
                 cloud={target.cloud}
                 initialReminder={target.reminder}
+                initialNotificationPrefs={target.notifications}
                 onShare={() => shareList(target.id)}
                 onUnshare={() => unshareList(target.id)}
                 onBack={() => setListSheetMode({ kind: 'menu' })}
-                onSave={(name, color, reminder) => {
+                onSave={(name, color, reminder, notifications) => {
                   updateList(target.id, { name, color })
                   setListReminder(target.id, reminder)
+                  setListNotificationPrefs(target.id, notifications)
                   setListSheetMode({ kind: 'menu' })
                 }}
               />
@@ -327,6 +330,7 @@ export function ListScreen() {
             initialColor={PALETTE[lists.length % PALETTE.length]}
             onBack={() => setListSheetMode({ kind: 'menu' })}
             onSave={(name, color) => {
+              // 新規作成時はまだ共有できないので、リマインダー・通知はここでは扱わない
               createList(name, color)
               setListSheetMode(null)
             }}
@@ -337,24 +341,28 @@ export function ListScreen() {
   )
 }
 
+const DEFAULT_NOTIFICATION_PREFS: ListNotificationPrefs = { onAdd: true, onRemove: true, onPurchase: true }
+
 interface ListEditFormProps {
   initialName: string
   initialColor: string
   /** 既存リストの編集時のみ渡す (新規作成時は保存前なので共有・リマインダーは設定できない) */
   cloud?: CloudLink
   initialReminder?: ListReminder
+  initialNotificationPrefs?: ListNotificationPrefs
   onShare?: () => Promise<void>
   onUnshare?: () => Promise<void>
   onBack: () => void
-  onSave: (name: string, color: string, reminder: ListReminder | null) => void
+  onSave: (name: string, color: string, reminder: ListReminder | null, notifications: ListNotificationPrefs) => void
 }
 
-/** リストの名前・マークの色・リマインダー・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+/** リストの名前・マークの色・リマインダー・通知・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
 function ListEditForm({
   initialName,
   initialColor,
   cloud,
   initialReminder,
+  initialNotificationPrefs,
   onShare,
   onUnshare,
   onBack,
@@ -363,8 +371,13 @@ function ListEditForm({
   const [name, setName] = useState(initialName)
   const [color, setColor] = useState(initialColor)
   const [reminder, setReminder] = useState<ListReminder | null>(initialReminder ?? null)
+  const [notifications, setNotifications] = useState<ListNotificationPrefs>(
+    initialNotificationPrefs ?? DEFAULT_NOTIFICATION_PREFS,
+  )
   // 共有と同じく、リマインダーも保存済みのリストにだけ設定できる
   const canEditReminder = onShare !== undefined
+  // 他の人の変更通知は、実際に共有中のリストでなければ意味が無い
+  const isShared = cloud != null
 
   return (
     <>
@@ -397,6 +410,8 @@ function ListEditForm({
 
       {onShare && onUnshare && <CloudShareSection cloud={cloud} onShare={onShare} onUnshare={onUnshare} />}
 
+      {isShared && <NotificationPrefsEditor prefs={notifications} onChange={setNotifications} />}
+
       <div className="row" style={{ gap: 8, marginTop: 4 }}>
         <button type="button" className="btn" onClick={onBack}>
           戻る
@@ -406,7 +421,7 @@ function ListEditForm({
           className="btn primary"
           style={{ flex: 1 }}
           disabled={!name.trim()}
-          onClick={() => onSave(name.trim(), color, reminder)}
+          onClick={() => onSave(name.trim(), color, reminder, notifications)}
         >
           保存
         </button>
@@ -510,6 +525,44 @@ function ReminderEditor({ reminder, onChange }: ReminderEditorProps) {
             </p>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+const NOTIFICATION_KINDS: Array<{ key: keyof ListNotificationPrefs; label: string }> = [
+  { key: 'onAdd', label: '追加' },
+  { key: 'onRemove', label: '削除' },
+  { key: 'onPurchase', label: '購入済みへ移動' },
+]
+
+interface NotificationPrefsEditorProps {
+  prefs: ListNotificationPrefs
+  onChange: (prefs: ListNotificationPrefs) => void
+}
+
+/** 共有リストで他の人が変更したときの通知を、種類ごとにオン/オフする。 */
+function NotificationPrefsEditor({ prefs, onChange }: NotificationPrefsEditorProps) {
+  return (
+    <div style={{ margin: '14px 0' }}>
+      <span className="muted" style={{ display: 'block', marginBottom: 6 }}>
+        他の人の変更を通知
+      </span>
+      {NOTIFICATION_KINDS.map(({ key, label }) => (
+        <label key={key} className="settings-row" style={{ marginBottom: 6 }}>
+          <span className="grow title">{label}</span>
+          <input
+            type="checkbox"
+            checked={prefs[key]}
+            onChange={(e) => onChange({ ...prefs, [key]: e.target.checked })}
+            aria-label={`「${label}」の通知`}
+          />
+        </label>
+      ))}
+      {!isReminderSupported() && (
+        <p className="muted" style={{ marginBottom: 0 }}>
+          通知が届くのはiPhoneアプリのときだけです。設定はこのまま保存できます。
+        </p>
       )}
     </div>
   )

@@ -5,6 +5,9 @@ import UIKit
 
 extension Notification.Name {
     static let cloudKitShareAccepted = Notification.Name("cloudKitShareAccepted")
+    /// AppDelegateがサイレントプッシュ (CKSubscriptionの通知) を受け取ったときに投げる。
+    /// 中身 (何が変わったか) は運ばない — 受け取った側はpull()し直して差分を見る。
+    static let cloudKitRecordChanged = Notification.Name("cloudKitRecordChanged")
 }
 
 /**
@@ -12,7 +15,8 @@ extension Notification.Name {
  サーバーを自前で持たず、Appleの CloudKit を使う (無料枠の範囲内)。
 
  データは JSON にシリアライズして CKAsset として保存し、CKShare で招待した相手と共有する。
- リアルタイムのプッシュ通知は使わず、アプリ起動時・共有操作時にのみ同期する (シンプルさ優先)。
+ 同期のきっかけは3つ: アプリ起動時・共有操作時・CKSubscriptionのサイレント通知
+ (enablePush参照。AppDelegateがリモート通知を受け取って .cloudKitRecordChanged を投げる)。
  */
 @objc(CloudSyncPlugin)
 public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -23,7 +27,8 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "share", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unshare", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pull", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "push", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "push", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enablePush", returnType: CAPPluginReturnPromise)
     ]
 
     private let container = CKContainer.default()
@@ -33,6 +38,9 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
     override public func load() {
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleShareAccepted), name: .cloudKitShareAccepted, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleRecordChanged), name: .cloudKitRecordChanged, object: nil
         )
     }
 
@@ -46,6 +54,51 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc private func handleShareAccepted() {
         notifyListeners("shareReceived", data: [:])
+    }
+
+    @objc private func handleRecordChanged() {
+        notifyListeners("recordChanged", data: [:])
+    }
+
+    // MARK: - プッシュ通知の準備 (CKSubscription + APNs)
+
+    /// リモート通知への登録と、変更を知らせてもらうためのサブスクリプションを用意する。
+    /// 参加者としてリストを受け取っている場合は sharedCloudDatabase、
+    /// 自分がオーナーの場合は privateCloudDatabase の変更をそれぞれ購読する必要があるため、
+    /// 両方に登録しておく (どちらに何も無くても購読自体は無害)。
+    @objc func enablePush(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+        let info = CKSubscription.NotificationInfo()
+        info.shouldSendContentAvailable = true // サイレント通知 (バナー等は出さない)
+
+        let group = DispatchGroup()
+        var anyError: Error?
+
+        for (db, subscriptionID) in [
+            (container.privateCloudDatabase, "private-changes"),
+            (container.sharedCloudDatabase, "shared-changes")
+        ] {
+            group.enter()
+            let subscription = CKDatabaseSubscription(subscriptionID: subscriptionID)
+            subscription.notificationInfo = info
+            let op = CKModifySubscriptionsOperation(subscriptionsToSave: [subscription], subscriptionIDsToDelete: nil)
+            op.modifySubscriptionsResultBlock = { result in
+                if case .failure(let error) = result {
+                    // 既に同じIDで登録済みの場合もここに来ることがあるが実害は無いので、
+                    // ログだけ残して成功扱いにする。
+                    CAPLog.print("CloudSyncPlugin: subscription (\(subscriptionID)) failed: \(error.localizedDescription)")
+                    anyError = error
+                }
+                group.leave()
+            }
+            db.add(op)
+        }
+
+        group.notify(queue: .main) {
+            call.resolve(["enabled": anyError == nil])
+        }
     }
 
     // MARK: - isAvailable
