@@ -29,8 +29,8 @@ export function RouteScreen() {
   const [activeStop, setActiveStop] = useState<number | null>(null)
 
   const plan = useMemo(
-    () => (store && list ? planRoute(store, list.items, routePreference) : null),
-    [store, list, routePreference],
+    () => (store && list ? planRoute(store, list.items, routePreference, categories) : null),
+    [store, list, routePreference, categories],
   )
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])

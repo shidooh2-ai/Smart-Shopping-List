@@ -1,3 +1,6 @@
+import { useMemo, useState } from 'react'
+import { groupCategories } from '../lib/categoryTree'
+import { normalize } from '../lib/normalize'
 import type { Category } from '../types'
 import { Sheet } from './Sheet'
 
@@ -24,38 +27,61 @@ export function CategoryPicker({
   onToggle,
   onClose,
 }: CategoryPickerProps) {
+  const [query, setQuery] = useState('')
+
+  const groups = useMemo(() => groupCategories(categories), [categories])
+  const filtered = useMemo(() => {
+    const q = normalize(query)
+    if (!q) return null
+    return categories.filter((c) => normalize(c.name).includes(q))
+  }, [categories, query])
+
+  const pick = (categoryId: string | null) => {
+    onToggle(categoryId)
+    if (!multiple) onClose()
+  }
+
+  const renderButton = (c: Category, indent = false) => (
+    <button
+      key={c.id}
+      type="button"
+      aria-pressed={selected.includes(c.id)}
+      onClick={() => pick(c.id)}
+      style={indent ? { paddingLeft: 20 } : undefined}
+    >
+      <span className="dot" style={{ background: c.color }} />
+      {indent && <span className="muted">└</span>}
+      {c.name}
+    </button>
+  )
+
   return (
     <Sheet open={open} title={title} onClose={onClose}>
       {multiple && <p className="muted" style={{ marginTop: 0 }}>タップで追加／解除できます（複数選択可）</p>}
+      {categories.length > 8 && (
+        <input
+          type="text"
+          value={query}
+          placeholder="ジャンルを検索"
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
+      )}
       <div className="picker">
         {allowNone && (
-          <button
-            type="button"
-            aria-pressed={selected.length === 0}
-            onClick={() => {
-              onToggle(null)
-              if (!multiple) onClose()
-            }}
-          >
+          <button type="button" aria-pressed={selected.length === 0} onClick={() => pick(null)}>
             <span className="dot" style={{ background: 'var(--text-dim)' }} />
             未設定にする
           </button>
         )}
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            aria-pressed={selected.includes(c.id)}
-            onClick={() => {
-              onToggle(c.id)
-              if (!multiple) onClose()
-            }}
-          >
-            <span className="dot" style={{ background: c.color }} />
-            {c.name}
-          </button>
-        ))}
+        {filtered
+          ? filtered.map((c) => renderButton(c))
+          : groups.flatMap(({ parent, children }) => [
+              renderButton(parent),
+              ...children.map((c) => renderButton(c, true)),
+            ])}
       </div>
+      {filtered && filtered.length === 0 && <p className="muted">見つかりませんでした。</p>}
     </Sheet>
   )
 }
