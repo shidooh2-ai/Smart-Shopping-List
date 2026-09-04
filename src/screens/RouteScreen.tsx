@@ -2,6 +2,13 @@ import { useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
+import type { RoutePreference } from '../types'
+
+const PREFERENCE_OPTIONS: Array<{ id: RoutePreference; label: string }> = [
+  { id: 'balanced', label: 'バランス' },
+  { id: 'stairs', label: '階段優先' },
+  { id: 'elevator', label: 'エレベーター優先' },
+]
 
 export function RouteScreen() {
   const list = useActiveList()
@@ -9,10 +16,15 @@ export function RouteScreen() {
   const categories = useAppStore((s) => s.categories)
   const setTab = useAppStore((s) => s.setTab)
   const setItemChecked = useAppStore((s) => s.setItemChecked)
+  const routePreference = useAppStore((s) => s.routePreference)
+  const setRoutePreference = useAppStore((s) => s.setRoutePreference)
   const [floorId, setFloorId] = useState<string | null>(null)
   const [activeStop, setActiveStop] = useState<number | null>(null)
 
-  const plan = useMemo(() => (store && list ? planRoute(store, list.items) : null), [store, list])
+  const plan = useMemo(
+    () => (store && list ? planRoute(store, list.items, routePreference) : null),
+    [store, list, routePreference],
+  )
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const itemById = useMemo(() => new Map((list?.items ?? []).map((i) => [i.id, i])), [list])
@@ -46,8 +58,30 @@ export function RouteScreen() {
   const missing = plan?.missingCategoryIds ?? []
   const unreachable = plan?.unreachableCategoryIds ?? []
 
+  const hasStairs = store.nodes.some((n) => n.kind === 'stairs')
+  const hasElevator = store.nodes.some((n) => n.kind === 'elevator')
+  const showPreference = store.floors.length > 1 && hasStairs && hasElevator
+
   return (
     <div className="screen">
+      {showPreference && (
+        <div className="card">
+          <h2>階段・エレベーターの優先</h2>
+          <div className="floortabs" style={{ marginBottom: 0 }}>
+            {PREFERENCE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={routePreference === opt.id}
+                onClick={() => setRoutePreference(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {plan && plan.stops.length > 0 && metrics && (
         <div className="card metrics-card">
           <div className="metrics">

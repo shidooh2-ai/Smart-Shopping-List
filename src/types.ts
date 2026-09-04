@@ -143,3 +143,6 @@ export interface RoutePlan {
   /** 同一フロア内で歩くマス数の合計 */
   totalSteps: number
 }
+
+/** 階をまたぐときに階段とエレベーターのどちらを優先するか。 */
+export type RoutePreference = 'balanced' | 'stairs' | 'elevator'

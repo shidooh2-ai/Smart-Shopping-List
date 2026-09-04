@@ -14,6 +14,7 @@ import type {
   Floor,
   MapNode,
   NodeKind,
+  RoutePreference,
   Shelf,
   ShoppingItem,
   ShoppingList,
@@ -39,10 +40,13 @@ export interface AppState {
   aliases: Record<string, string>
   activeListId: string | null
   tab: Tab
+  /** 階をまたぐルート計算で階段/エレベーターのどちらを優先するか */
+  routePreference: RoutePreference
   /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
   mapHistory: Record<string, StoreMap[]>
 
   setTab: (tab: Tab) => void
+  setRoutePreference: (preference: RoutePreference) => void
 
   // --- 買い物リスト ---
   createList: (name?: string) => string
@@ -141,6 +145,7 @@ function initialState() {
     aliases: {} as Record<string, string>,
     activeListId: list.id,
     tab: 'list' as Tab,
+    routePreference: 'balanced' as RoutePreference,
     mapHistory: {} as Record<string, StoreMap[]>,
   }
 }
@@ -240,6 +245,7 @@ export const useAppStore = create<AppState>()(
       ...initialState(),
 
       setTab: (tab) => set({ tab }),
+      setRoutePreference: (routePreference) => set({ routePreference }),
 
       // --- 買い物リスト ---
       createList: (name) => {
@@ -758,12 +764,13 @@ export const useAppStore = create<AppState>()(
       name: 'smart-shopping-list',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: ({ stores, lists, categories, aliases, activeListId }) => ({
+      partialize: ({ stores, lists, categories, aliases, activeListId, routePreference }) => ({
         stores,
         lists,
         categories,
         aliases,
         activeListId,
+        routePreference,
       }),
     },
   ),

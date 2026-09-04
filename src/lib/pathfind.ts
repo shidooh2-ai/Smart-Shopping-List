@@ -1,4 +1,4 @@
-import type { MapNode, Pos, StoreMap } from '../types'
+import type { MapNode, Pos, RoutePreference, StoreMap } from '../types'
 import { NEIGHBORS, cellAt, getFloor, idx, isWalkable, posKey } from './grid'
 
 /** 移動コストの設定。1マス歩く = 1。 */
@@ -9,6 +9,12 @@ export const COST = {
   elevatorBase: 8,
   /** エレベーター: 1フロアごとの追加コスト */
   elevatorPerLevel: 2,
+  /**
+   * 「階段優先」「エレベーター優先」を選んだときに、選ばなかった方の階間移動
+   * コストに掛ける倍率。他に手段が無いときは (割高でも) 使われるように、
+   * 通行不能にはせず大きなペナルティを掛けるだけにする。
+   */
+  nonPreferredPenalty: 8,
 }
 
 export interface Graph {
@@ -21,7 +27,7 @@ export interface Graph {
 }
 
 /** 全フロアの通行可能マスをつなぎ、階段/エレベーターで階をまたぐグラフを作る。 */
-export function buildGraph(map: StoreMap): Graph {
+export function buildGraph(map: StoreMap, preference: RoutePreference = 'balanced'): Graph {
   const positions: Pos[] = []
   const index = new Map<string, number>()
 
@@ -94,9 +100,12 @@ export function buildGraph(map: StoreMap): Graph {
         if (la === undefined || lb === undefined || la === lb) continue
         const diff = Math.abs(la - lb)
         const isElevator = a.node.kind === 'elevator' || b.node.kind === 'elevator'
-        const cost = isElevator
+        let cost = isElevator
           ? COST.elevatorBase + COST.elevatorPerLevel * diff
           : COST.stairsPerLevel * diff
+        if ((preference === 'stairs' && isElevator) || (preference === 'elevator' && !isElevator)) {
+          cost *= COST.nonPreferredPenalty
+        }
         link(a.graphIdx, b.graphIdx, cost)
       }
     }

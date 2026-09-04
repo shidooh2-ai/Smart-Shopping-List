@@ -1,4 +1,4 @@
-import type { Pos, RouteLeg, RoutePlan, RouteStop, ShoppingItem, StoreMap } from '../types'
+import type { Pos, RouteLeg, RoutePlan, RoutePreference, RouteStop, ShoppingItem, StoreMap } from '../types'
 import { getFloor, nodePos, posKey, shelfAccessCells, shelfCells } from './grid'
 import { type Distances, type Graph, buildGraph, dijkstra, reconstructPath } from './pathfind'
 
@@ -37,12 +37,16 @@ const emptyPlan = (): RoutePlan => ({
  * 3. 入口→各ジャンル(1棚選択)→レジ を最短で回る順序を解く
  *    (集合TSP。12ジャンル以下は厳密解、それ以上は最近傍法+2-opt)
  */
-export function planRoute(map: StoreMap, items: ShoppingItem[]): RoutePlan {
+export function planRoute(
+  map: StoreMap,
+  items: ShoppingItem[],
+  preference: RoutePreference = 'balanced',
+): RoutePlan {
   const plan = emptyPlan()
   const active = items.filter((i) => !i.checked)
   plan.unresolvedItemIds = active.filter((i) => !i.categoryId).map((i) => i.id)
 
-  const graph = buildGraph(map)
+  const graph = buildGraph(map, preference)
   if (graph.positions.length === 0) return plan
 
   // --- 出発地点と終了地点 ---

@@ -63,6 +63,54 @@ describe('buildGraph', () => {
     const { dist } = dijkstra(g, g.index.get(`${map.floors[0].id}:1,1`)!)
     expect(dist[g.index.get(`${map.floors[1].id}:1,1`)!]).toBe(Infinity)
   })
+
+  describe('preference (階段/エレベーター優先)', () => {
+    const twoWayMap = () =>
+      buildStoreFromAscii('t', [
+        {
+          name: '1F', level: 1, rows: ['#######', '#.....#', '#S...E#', '#######'],
+          nodes: {
+            S: { kind: 'stairs', name: '階段', groupId: 'st' },
+            E: { kind: 'elevator', name: 'EV', groupId: 'el' },
+          },
+        },
+        {
+          name: '2F', level: 2, rows: ['#######', '#.....#', '#S...E#', '#######'],
+          nodes: {
+            S: { kind: 'stairs', name: '階段', groupId: 'st' },
+            E: { kind: 'elevator', name: 'EV', groupId: 'el' },
+          },
+        },
+      ])
+
+    it('balanced では、歩く距離込みで安い方 (この配置では階段) が自然に選ばれる', () => {
+      const map = twoWayMap()
+      const g = buildGraph(map, 'balanced')
+      const start = g.index.get(`${map.floors[0].id}:1,1`)!
+      const goal = g.index.get(`${map.floors[1].id}:5,1`)!
+      const { dist } = dijkstra(g, start)
+      // 階段経由: 1(1F歩) + 6(階段) + 5(2F歩) = 12 / エレベーター経由: 5 + 10 + 1 = 16
+      expect(dist[goal]).toBe(12)
+    })
+
+    it('エレベーター優先を選ぶと、階段の方が近くてもエレベーター経由になる', () => {
+      const map = twoWayMap()
+      const g = buildGraph(map, 'elevator')
+      const start = g.index.get(`${map.floors[0].id}:1,1`)!
+      const goal = g.index.get(`${map.floors[1].id}:5,1`)!
+      const { dist } = dijkstra(g, start)
+      expect(dist[goal]).toBe(16)
+    })
+
+    it('階段優先ならバランスと同じく階段経由のまま', () => {
+      const map = twoWayMap()
+      const g = buildGraph(map, 'stairs')
+      const start = g.index.get(`${map.floors[0].id}:1,1`)!
+      const goal = g.index.get(`${map.floors[1].id}:5,1`)!
+      const { dist } = dijkstra(g, start)
+      expect(dist[goal]).toBe(12)
+    })
+  })
 })
 
 describe('planRoute', () => {
