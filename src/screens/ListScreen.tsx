@@ -6,7 +6,7 @@ import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { useActiveList, useAppStore } from '../store/useAppStore'
-import type { Category, ShoppingItem, StoreMap } from '../types'
+import type { Category, CloudLink, ShoppingItem, StoreMap } from '../types'
 
 const SHOPPING_VIEWS = [
   { id: 'list' as const, label: 'リスト' },
@@ -242,11 +242,6 @@ export function ListScreen() {
       >
         {listSheetMode?.kind === 'menu' && (
           <>
-            <CloudShareSection
-              cloud={list.cloud}
-              onShare={() => shareList(list.id)}
-              onUnshare={() => unshareList(list.id)}
-            />
             <ul className="list-rows">
               {lists.map((l) => (
                 <li key={l.id}>
@@ -316,6 +311,9 @@ export function ListScreen() {
                 initialColor={target.color ?? PALETTE[0]}
                 initialStoreId={target.storeId}
                 stores={stores}
+                cloud={target.cloud}
+                onShare={() => shareList(target.id)}
+                onUnshare={() => unshareList(target.id)}
                 onBack={() => setListSheetMode({ kind: 'menu' })}
                 onGoToStoreSetup={() => {
                   setStoreView('map')
@@ -360,17 +358,24 @@ interface ListEditFormProps {
   initialColor: string
   initialStoreId: string | null
   stores: StoreMap[]
+  /** 既存リストの編集時のみ渡す (新規作成時は保存前なので共有できない) */
+  cloud?: CloudLink
+  onShare?: () => Promise<void>
+  onUnshare?: () => Promise<void>
   onBack: () => void
   onGoToStoreSetup: () => void
   onSave: (name: string, color: string, storeId: string | null) => void
 }
 
-/** リストの名前・マークの色・買い物する店舗を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+/** リストの名前・マークの色・買い物する店舗・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
 function ListEditForm({
   initialName,
   initialColor,
   initialStoreId,
   stores,
+  cloud,
+  onShare,
+  onUnshare,
   onBack,
   onGoToStoreSetup,
   onSave,
@@ -426,6 +431,8 @@ function ListEditForm({
           で追加できます。
         </p>
       )}
+
+      {onShare && onUnshare && <CloudShareSection cloud={cloud} onShare={onShare} onUnshare={onUnshare} />}
 
       <div className="row" style={{ gap: 8, marginTop: 4 }}>
         <button type="button" className="btn" onClick={onBack}>
