@@ -82,7 +82,16 @@ textarea {
    .app は position:fixed + inset:0 で実際のビューポート端に直接固定する。
    100dvh を使った高さ計算は、実機のWKWebViewでは safe area の変化時に
    ずれることがあり、画面の一部がヘッダーやフッターの裏に隠れたまま
-   スクロールしても届かなくなる不具合の原因になっていたため。 */
+   スクロールしても届かなくなる不具合の原因になっていたため。
+
+   タブバーはスクロールに応じて隠す/出すのではなく常に固定表示とし、
+   .app 内で position:absolute によって下端に貼り付ける (bottom:0)。
+   .screen 側は --tabbar-h ぶんを padding-bottom として必ず確保するので、
+   flexのレイアウト計算がどうであれ、本文がタブバーの下に隠れることはない。 */
+:root {
+  --tabbar-h: 62px;
+}
+
 .app {
   position: fixed;
   inset: 0;
@@ -100,29 +109,23 @@ textarea {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px 24px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px
+    calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px);
 }
 
 .tabbar {
-  flex: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  min-height: var(--tabbar-h);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 10px);
-  overflow: hidden;
-  max-height: 120px;
-  opacity: 1;
-  transition: max-height 0.22s ease, padding-top 0.22s ease, padding-bottom 0.22s ease, opacity 0.18s ease;
-}
-
-.tabbar.hidden {
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .tabbar button {
