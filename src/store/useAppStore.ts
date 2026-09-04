@@ -14,6 +14,7 @@ import type {
   Cell,
   CloudLink,
   Floor,
+  ListReminder,
   MapNode,
   NodeKind,
   PurchasedItem,
@@ -74,6 +75,8 @@ export interface AppState {
   createList: (name?: string, color?: string) => string
   deleteList: (listId: string) => void
   updateList: (listId: string, patch: { name?: string; color?: string }) => void
+  /** リストのリマインダー設定を変更する (null で解除) */
+  setListReminder: (listId: string, reminder: ListReminder | null) => void
   setActiveList: (listId: string) => void
   setListStore: (listId: string, storeId: string | null) => void
   addItems: (listId: string, text: string) => void
@@ -312,6 +315,11 @@ export const useAppStore = create<AppState>()(
         }),
 
       updateList: (listId, patch) => set((s) => ({ lists: mapList(s.lists, listId, (l) => ({ ...l, ...patch })) })),
+
+      setListReminder: (listId, reminder) =>
+        set((s) => ({
+          lists: mapList(s.lists, listId, (l) => ({ ...l, reminder: reminder ?? undefined })),
+        })),
 
       setActiveList: (listId) => set({ activeListId: listId }),
 

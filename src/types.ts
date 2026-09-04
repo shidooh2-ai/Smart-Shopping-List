@@ -77,11 +77,27 @@ export interface ShoppingItem {
   addedBy?: string | null
 }
 
+/** リマインダーの繰り返し方。'once' は指定日時に1回だけ */
+export type ReminderRepeat = 'once' | 'daily' | 'weekly'
+
+export interface ListReminder {
+  enabled: boolean
+  /** 通知する時刻 'HH:mm' */
+  time: string
+  repeat: ReminderRepeat
+  /** repeat==='once' のときの日付 'YYYY-MM-DD' */
+  date?: string
+  /** repeat==='weekly' のときの曜日 (0=日曜 〜 6=土曜)。空なら通知しない */
+  weekdays?: number[]
+}
+
 export interface ShoppingList {
   id: string
   name: string
   /** リストを見分けるためのマークの色 */
   color?: string
+  /** このリストのリマインダー設定 (未設定なら通知しない) */
+  reminder?: ListReminder
   storeId: string | null
   items: ShoppingItem[]
   createdAt: number

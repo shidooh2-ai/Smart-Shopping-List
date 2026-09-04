@@ -4,8 +4,18 @@ import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
 import { PALETTE } from '../data/palette'
+import { WEEKDAY_LABELS, describeReminder, isReminderSupported } from '../lib/reminders'
 import { useActiveList, useAppStore } from '../store/useAppStore'
-import type { Category, CloudLink, ShoppingItem } from '../types'
+import type { Category, CloudLink, ListReminder, ReminderRepeat, ShoppingItem } from '../types'
+
+const REPEAT_OPTIONS: Array<{ id: ReminderRepeat; label: string }> = [
+  { id: 'once', label: '1回だけ' },
+  { id: 'daily', label: '毎日' },
+  { id: 'weekly', label: '毎週' },
+]
+
+/** リマインダーをオンにしたときの初期値 */
+const DEFAULT_REMINDER: ListReminder = { enabled: true, time: '18:00', repeat: 'daily' }
 
 /** 「リスト管理」シート内の表示状態。一覧か、既存/新規リストの名前・色編集か。 */
 type ListSheetMode = { kind: 'menu' } | { kind: 'edit'; listId: string } | { kind: 'new' }
@@ -27,6 +37,7 @@ export function ListScreen() {
     createList,
     deleteList,
     updateList,
+    setListReminder,
     setActiveList,
     shareList,
     unshareList,
@@ -297,11 +308,13 @@ export function ListScreen() {
                 initialName={target.name}
                 initialColor={target.color ?? PALETTE[0]}
                 cloud={target.cloud}
+                initialReminder={target.reminder}
                 onShare={() => shareList(target.id)}
                 onUnshare={() => unshareList(target.id)}
                 onBack={() => setListSheetMode({ kind: 'menu' })}
-                onSave={(name, color) => {
+                onSave={(name, color, reminder) => {
                   updateList(target.id, { name, color })
+                  setListReminder(target.id, reminder)
                   setListSheetMode({ kind: 'menu' })
                 }}
               />
@@ -327,18 +340,31 @@ export function ListScreen() {
 interface ListEditFormProps {
   initialName: string
   initialColor: string
-  /** 既存リストの編集時のみ渡す (新規作成時は保存前なので共有できない) */
+  /** 既存リストの編集時のみ渡す (新規作成時は保存前なので共有・リマインダーは設定できない) */
   cloud?: CloudLink
+  initialReminder?: ListReminder
   onShare?: () => Promise<void>
   onUnshare?: () => Promise<void>
   onBack: () => void
-  onSave: (name: string, color: string) => void
+  onSave: (name: string, color: string, reminder: ListReminder | null) => void
 }
 
-/** リストの名前・マークの色・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
-function ListEditForm({ initialName, initialColor, cloud, onShare, onUnshare, onBack, onSave }: ListEditFormProps) {
+/** リストの名前・マークの色・リマインダー・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+function ListEditForm({
+  initialName,
+  initialColor,
+  cloud,
+  initialReminder,
+  onShare,
+  onUnshare,
+  onBack,
+  onSave,
+}: ListEditFormProps) {
   const [name, setName] = useState(initialName)
   const [color, setColor] = useState(initialColor)
+  const [reminder, setReminder] = useState<ListReminder | null>(initialReminder ?? null)
+  // 共有と同じく、リマインダーも保存済みのリストにだけ設定できる
+  const canEditReminder = onShare !== undefined
 
   return (
     <>
@@ -367,6 +393,8 @@ function ListEditForm({ initialName, initialColor, cloud, onShare, onUnshare, on
         ))}
       </div>
 
+      {canEditReminder && <ReminderEditor reminder={reminder} onChange={setReminder} />}
+
       {onShare && onUnshare && <CloudShareSection cloud={cloud} onShare={onShare} onUnshare={onUnshare} />}
 
       <div className="row" style={{ gap: 8, marginTop: 4 }}>
@@ -378,12 +406,112 @@ function ListEditForm({ initialName, initialColor, cloud, onShare, onUnshare, on
           className="btn primary"
           style={{ flex: 1 }}
           disabled={!name.trim()}
-          onClick={() => onSave(name.trim(), color)}
+          onClick={() => onSave(name.trim(), color, reminder)}
         >
           保存
         </button>
       </div>
     </>
+  )
+}
+
+interface ReminderEditorProps {
+  reminder: ListReminder | null
+  onChange: (reminder: ListReminder | null) => void
+}
+
+/** リストごとのリマインダー設定 (オン/オフ・時刻・繰り返し方)。 */
+function ReminderEditor({ reminder, onChange }: ReminderEditorProps) {
+  const enabled = reminder?.enabled ?? false
+  const current = reminder ?? DEFAULT_REMINDER
+  const patch = (changes: Partial<ListReminder>) => onChange({ ...current, ...changes, enabled: true })
+
+  const toggleWeekday = (day: number) => {
+    const weekdays = new Set(current.weekdays ?? [])
+    if (weekdays.has(day)) weekdays.delete(day)
+    else weekdays.add(day)
+    patch({ weekdays: [...weekdays].sort() })
+  }
+
+  return (
+    <div style={{ margin: '14px 0' }}>
+      <label className="settings-row">
+        <span className="grow">
+          <span className="title">リマインダー</span>
+          <span className="muted">{describeReminder(reminder ?? undefined)}</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onChange(e.target.checked ? { ...current, enabled: true } : null)}
+          aria-label="リマインダー"
+        />
+      </label>
+
+      {enabled && (
+        <div style={{ marginTop: 10 }}>
+          <div className="floortabs" style={{ marginBottom: 10 }}>
+            {REPEAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={current.repeat === opt.id}
+                onClick={() => patch({ repeat: opt.id })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {current.repeat === 'once' && (
+            <label className="field">
+              <span>日付</span>
+              <input
+                type="date"
+                value={current.date ?? ''}
+                onChange={(e) => patch({ date: e.target.value || undefined })}
+              />
+            </label>
+          )}
+
+          {current.repeat === 'weekly' && (
+            <>
+              <span className="muted">曜日</span>
+              <div className="row wrap" style={{ margin: '6px 0 10px' }}>
+                {WEEKDAY_LABELS.map((label, day) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className="btn slim"
+                    aria-pressed={(current.weekdays ?? []).includes(day)}
+                    onClick={() => toggleWeekday(day)}
+                    style={{
+                      minWidth: 40,
+                      padding: '0 10px',
+                      background: (current.weekdays ?? []).includes(day) ? 'var(--accent-weak)' : undefined,
+                      color: (current.weekdays ?? []).includes(day) ? 'var(--accent)' : undefined,
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <label className="field" style={{ marginBottom: 0 }}>
+            <span>時刻</span>
+            <input type="time" value={current.time} onChange={(e) => patch({ time: e.target.value })} />
+          </label>
+
+          {!isReminderSupported() && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              通知が届くのはiPhoneアプリのときだけです。設定はこのまま保存できます。
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ListGlyph, RouteGlyph, SettingsGlyph } from './components/icons'
 import { startCloudSyncBridge } from './lib/cloudSyncBridge'
+import { startReminderBridge } from './lib/reminderBridge'
 import { useScreenWakeLock } from './lib/wakeLock'
 import { startWidgetBridge } from './lib/widgetBridge'
 import { GenreScreen } from './screens/GenreScreen'
@@ -26,6 +27,7 @@ export default function App() {
   useEffect(() => {
     startCloudSyncBridge()
     startWidgetBridge()
+    startReminderBridge()
   }, [])
 
   // 'default' は属性を付けずに、端末のライト/ダーク設定 (CSSのメディアクエリ) に任せる。

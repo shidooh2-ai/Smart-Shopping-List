@@ -361,6 +361,7 @@ button.btn:disabled {
 input[type='text'],
 input[type='number'],
 input[type='date'],
+input[type='time'],
 select,
 textarea {
   width: 100%;
@@ -374,6 +375,7 @@ textarea {
 input[type='text']:focus-visible,
 input[type='number']:focus-visible,
 input[type='date']:focus-visible,
+input[type='time']:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
