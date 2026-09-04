@@ -4,6 +4,7 @@ import { CloudSync, type CloudSyncItem } from '../lib/cloudSync'
 import { cloneDefaultCategories } from '../data/categories'
 import { PALETTE } from '../data/palette'
 import { createSampleStore } from '../data/sampleStore'
+import type { ThemeId } from '../data/themes'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
 import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
@@ -55,6 +56,8 @@ export interface AppState {
   nickname: string
   /** 画面ロック (自動スリープ) を無効化するか */
   screenWakeLockEnabled: boolean
+  /** 画面の配色。'default' は端末のライト/ダーク設定に従う */
+  theme: ThemeId
   /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
   mapHistory: Record<string, StoreMap[]>
   /** storeId ごとの「やり直す」用スナップショット (元に戻す操作で積む)。保存はしない */
@@ -65,6 +68,7 @@ export interface AppState {
   setRoutePreference: (preference: RoutePreference) => void
   setNickname: (nickname: string) => void
   setScreenWakeLockEnabled: (enabled: boolean) => void
+  setTheme: (theme: ThemeId) => void
 
   // --- 買い物リスト ---
   createList: (name?: string, color?: string) => string
@@ -185,6 +189,7 @@ function initialState() {
     routePreference: 'balanced' as RoutePreference,
     nickname: '',
     screenWakeLockEnabled: false,
+    theme: 'default' as ThemeId,
     mapHistory: {} as Record<string, StoreMap[]>,
     mapRedo: {} as Record<string, StoreMap[]>,
   }
@@ -289,6 +294,7 @@ export const useAppStore = create<AppState>()(
       setRoutePreference: (routePreference) => set({ routePreference }),
       setNickname: (nickname) => set({ nickname }),
       setScreenWakeLockEnabled: (screenWakeLockEnabled) => set({ screenWakeLockEnabled }),
+      setTheme: (theme) => set({ theme }),
 
       // --- 買い物リスト ---
       createList: (name, color) => {
@@ -879,6 +885,7 @@ export const useAppStore = create<AppState>()(
         purchased,
         nickname,
         screenWakeLockEnabled,
+        theme,
       }) => ({
         stores,
         lists,
@@ -889,6 +896,7 @@ export const useAppStore = create<AppState>()(
         purchased,
         nickname,
         screenWakeLockEnabled,
+        theme,
       }),
     },
   ),

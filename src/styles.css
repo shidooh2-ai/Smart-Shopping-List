@@ -23,8 +23,10 @@
   color-scheme: light;
 }
 
+/* テーマ未指定 (設定=デフォルト) のときだけ、端末のダーク設定に従う。
+   下の [data-theme='dark'] と同じ配色 — 片方を変えたらもう片方も合わせること。 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #1c1712;
     --surface: #29221a;
     --surface-2: #322a20;
@@ -45,6 +47,120 @@
     --shadow-fab: 0 8px 18px rgba(255, 145, 102, 0.3);
     color-scheme: dark;
   }
+}
+
+/* ---------- テーマ ----------
+   :root だけでなく任意の要素に効くよう、あえて属性セレクタだけで書く。
+   設定画面のテーマ見本は <span data-theme="..."> の中で var(--bg) 等を参照して
+   その配色をそのまま表示している。 */
+[data-theme='dark'] {
+  --bg: #1c1712;
+  --surface: #29221a;
+  --surface-2: #322a20;
+  --text: #f6efe4;
+  --text-dim: #b3a48f;
+  --border: #423628;
+  --outline: #574936;
+  --tab-inactive: #6b5d47;
+  --accent: #3fbd76;
+  --accent-weak: #1f3c2b;
+  --accent-text: #07130c;
+  --coral: #ff9166;
+  --coral-weak: #3a2418;
+  --danger: #ef5350;
+  --warn: #e8a33d;
+  --warn-weak: #3a2f1a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-fab: 0 8px 18px rgba(255, 145, 102, 0.3);
+  color-scheme: dark;
+}
+
+[data-theme='ocean'] {
+  --bg: #f2f8fb;
+  --surface: #ffffff;
+  --surface-2: #e7f1f8;
+  --text: #112b39;
+  --text-dim: #628090;
+  --border: #dcebf3;
+  --outline: #b8d2e0;
+  --tab-inactive: #9cb7c6;
+  --accent: #0f80a9;
+  --accent-weak: #ddf0f8;
+  --accent-text: #ffffff;
+  --coral: #ef6f5a;
+  --coral-weak: #fde9e3;
+  --danger: #cf4436;
+  --warn: #a9721a;
+  --warn-weak: #fbeed6;
+  --shadow-card: 0 1px 2px rgba(17, 43, 57, 0.08);
+  --shadow-fab: 0 8px 18px rgba(239, 111, 90, 0.35);
+  color-scheme: light;
+}
+
+[data-theme='sakura'] {
+  --bg: #fff5f7;
+  --surface: #ffffff;
+  --surface-2: #fdeaef;
+  --text: #3a2229;
+  --text-dim: #96737d;
+  --border: #f7dde4;
+  --outline: #e6c2cc;
+  --tab-inactive: #cba9b3;
+  --accent: #d9527e;
+  --accent-weak: #fce1ea;
+  --accent-text: #ffffff;
+  --coral: #f0864f;
+  --coral-weak: #fdeade;
+  --danger: #d0413f;
+  --warn: #b0741f;
+  --warn-weak: #fbeed8;
+  --shadow-card: 0 1px 2px rgba(58, 34, 41, 0.07);
+  --shadow-fab: 0 8px 18px rgba(217, 82, 126, 0.35);
+  color-scheme: light;
+}
+
+[data-theme='forest'] {
+  --bg: #101a14;
+  --surface: #182620;
+  --surface-2: #1f2f27;
+  --text: #e9f3ec;
+  --text-dim: #9ab3a4;
+  --border: #2a3d33;
+  --outline: #3a5347;
+  --tab-inactive: #5b7566;
+  --accent: #5cc98d;
+  --accent-weak: #1c3a2a;
+  --accent-text: #06150d;
+  --coral: #f0a15e;
+  --coral-weak: #33261a;
+  --danger: #ef5f5a;
+  --warn: #e0a94a;
+  --warn-weak: #332c19;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-fab: 0 8px 18px rgba(240, 161, 94, 0.28);
+  color-scheme: dark;
+}
+
+[data-theme='mono'] {
+  --bg: #f5f5f4;
+  --surface: #ffffff;
+  --surface-2: #ececea;
+  --text: #1c1c1b;
+  --text-dim: #71716e;
+  --border: #e2e2df;
+  --outline: #c4c4c0;
+  --tab-inactive: #a3a39f;
+  --accent: #3a3a37;
+  --accent-weak: #e4e4e1;
+  --accent-text: #ffffff;
+  --coral: #4a4a47;
+  --coral-weak: #dededb;
+  --danger: #9c3b2e;
+  --warn: #7a6a3f;
+  --warn-weak: #ebe7dc;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-fab: 0 8px 18px rgba(0, 0, 0, 0.18);
+  color-scheme: light;
 }
 
 * {
@@ -944,4 +1060,51 @@ label.field > span {
   width: 26px;
   height: 26px;
   accent-color: var(--accent);
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.theme-grid button {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-grid button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+
+/* テーマの見本。data-theme を持たせて、その配色の変数をそのまま描画する */
+.theme-preview {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.theme-preview i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }

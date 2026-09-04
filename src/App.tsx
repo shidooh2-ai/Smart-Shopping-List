@@ -20,10 +20,22 @@ export default function App() {
   const setTab = useAppStore((s) => s.setTab)
   const settingsView = useAppStore((s) => s.settingsView)
   const screenWakeLockEnabled = useAppStore((s) => s.screenWakeLockEnabled)
+  const theme = useAppStore((s) => s.theme)
 
   useEffect(() => {
     startCloudSyncBridge()
   }, [])
+
+  // 'default' は属性を付けずに、端末のライト/ダーク設定 (CSSのメディアクエリ) に任せる。
+  // ブラウザのUI色 (theme-color) も、適用後の背景色を読み取って合わせる。
+  useEffect(() => {
+    const root = document.documentElement
+    if (theme === 'default') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', theme)
+    const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (bg && meta) meta.setAttribute('content', bg)
+  }, [theme])
 
   useScreenWakeLock(screenWakeLockEnabled)
 

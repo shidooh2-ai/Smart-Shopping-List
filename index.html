@@ -23,6 +23,15 @@
       href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap"
     />
     <title>かいものルート</title>
+    <script>
+      // 保存済みのテーマを描画前に適用する (アプリ起動時に既定色が一瞬見えるのを防ぐ)。
+      // 読めなくても実害はないので、失敗は握りつぶして React 側の適用に任せる。
+      try {
+        var saved = JSON.parse(localStorage.getItem('smart-shopping-list') || '{}')
+        var theme = saved && saved.state && saved.state.theme
+        if (theme && theme !== 'default') document.documentElement.setAttribute('data-theme', theme)
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

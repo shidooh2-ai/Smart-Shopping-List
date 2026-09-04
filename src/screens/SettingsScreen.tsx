@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ViewSwitch } from '../components/ViewSwitch'
+import { THEMES } from '../data/themes'
 import { isWakeLockSupported } from '../lib/wakeLock'
 import { useAppStore } from '../store/useAppStore'
 
@@ -15,6 +16,8 @@ export function SettingsScreen() {
   const screenWakeLockEnabled = useAppStore((s) => s.screenWakeLockEnabled)
   const setScreenWakeLockEnabled = useAppStore((s) => s.setScreenWakeLockEnabled)
   const setSettingsView = useAppStore((s) => s.setSettingsView)
+  const theme = useAppStore((s) => s.theme)
+  const setTheme = useAppStore((s) => s.setTheme)
   const [name, setName] = useState(nickname)
   const wakeLockSupported = isWakeLockSupported()
 
@@ -33,6 +36,30 @@ export function SettingsScreen() {
           onChange={(e) => setName(e.target.value)}
           onBlur={() => setNickname(name.trim())}
         />
+      </div>
+
+      <div className="card">
+        <h2>テーマ</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          「デフォルト」は端末のライト／ダーク設定に合わせて自動で切り替わります。
+        </p>
+        <div className="theme-grid">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={theme === t.id}
+              onClick={() => setTheme(t.id)}
+            >
+              <span className="theme-preview" data-theme={t.id === 'default' ? undefined : t.id}>
+                <i style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} />
+                <i style={{ background: 'var(--accent)' }} />
+                <i style={{ background: 'var(--coral)' }} />
+              </span>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="card">
