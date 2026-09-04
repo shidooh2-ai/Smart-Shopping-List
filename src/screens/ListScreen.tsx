@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react'
-import { AddStoreSheet } from '../components/AddStoreSheet'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
@@ -7,7 +6,7 @@ import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { useActiveList, useAppStore } from '../store/useAppStore'
-import type { Category, ShoppingItem } from '../types'
+import type { Category, ShoppingItem, StoreMap } from '../types'
 
 const SHOPPING_VIEWS = [
   { id: 'list' as const, label: 'リスト' },
@@ -40,8 +39,6 @@ export function ListScreen() {
     setTab,
     setShoppingView,
     setStoreView,
-    createStore,
-    addSampleStore,
     shareList,
     unshareList,
   } = useAppStore()
@@ -50,7 +47,6 @@ export function ListScreen() {
   const [grouped, setGrouped] = useState(true)
   const [pickerItem, setPickerItem] = useState<string | null>(null)
   const [listSheetMode, setListSheetMode] = useState<ListSheetMode | null>(null)
-  const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [purchasedSheet, setPurchasedSheet] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -112,51 +108,7 @@ export function ListScreen() {
             リスト管理
           </button>
         </div>
-        <span className="muted" style={{ display: 'block', marginBottom: 4 }}>
-          買い物する店舗
-        </span>
-        <div className="row" style={{ marginBottom: 0 }}>
-          <select
-            value={list.storeId ?? ''}
-            onChange={(e) => setListStore(list.id, e.target.value || null)}
-            style={{ flex: 1 }}
-          >
-            <option value="">（未選択）</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn slim" onClick={() => setAddStoreSheet(true)}>
-            ＋ 追加
-          </button>
-        </div>
-        {!list.storeId && (
-          <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
-            店舗を選ぶとルートを作成できます。マップの作り方は
-            <button
-              type="button"
-              className="btn slim"
-              style={{ margin: '0 4px' }}
-              onClick={() => {
-                setStoreView('map')
-                setTab('store')
-              }}
-            >
-              マップ画面
-            </button>
-            から。
-          </p>
-        )}
       </div>
-
-      <AddStoreSheet
-        open={addStoreSheet}
-        onClose={() => setAddStoreSheet(false)}
-        onCreate={(name) => setListStore(list.id, createStore(name))}
-        onCreateSample={() => setListStore(list.id, addSampleStore())}
-      />
 
       <div className="card">
         <div className="additem">
@@ -177,12 +129,10 @@ export function ListScreen() {
             追加
           </button>
         </div>
-        <p className="muted" style={{ margin: '8px 0 0' }}>
+        <p className="muted" style={{ margin: '8px 0 12px' }}>
           改行や読点で区切ると、まとめて追加できます。
         </p>
-      </div>
 
-      <div className="card">
         <div className="row" style={{ marginBottom: 6 }}>
           <h2 style={{ margin: 0 }}>
             未購入 {remaining} / 全 {list.items.length} 件
@@ -364,9 +314,17 @@ export function ListScreen() {
                 key={target.id}
                 initialName={target.name}
                 initialColor={target.color ?? PALETTE[0]}
+                initialStoreId={target.storeId}
+                stores={stores}
                 onBack={() => setListSheetMode({ kind: 'menu' })}
-                onSave={(name, color) => {
+                onGoToStoreSetup={() => {
+                  setStoreView('map')
+                  setTab('store')
+                  setListSheetMode(null)
+                }}
+                onSave={(name, color, storeId) => {
                   updateList(target.id, { name, color })
+                  setListStore(target.id, storeId)
                   setListSheetMode({ kind: 'menu' })
                 }}
               />
@@ -377,9 +335,17 @@ export function ListScreen() {
           <ListEditForm
             initialName={`買い物リスト ${lists.length + 1}`}
             initialColor={PALETTE[lists.length % PALETTE.length]}
+            initialStoreId={null}
+            stores={stores}
             onBack={() => setListSheetMode({ kind: 'menu' })}
-            onSave={(name, color) => {
-              createList(name, color)
+            onGoToStoreSetup={() => {
+              setStoreView('map')
+              setTab('store')
+              setListSheetMode(null)
+            }}
+            onSave={(name, color, storeId) => {
+              const id = createList(name, color)
+              setListStore(id, storeId)
               setListSheetMode(null)
             }}
           />
@@ -392,14 +358,26 @@ export function ListScreen() {
 interface ListEditFormProps {
   initialName: string
   initialColor: string
+  initialStoreId: string | null
+  stores: StoreMap[]
   onBack: () => void
-  onSave: (name: string, color: string) => void
+  onGoToStoreSetup: () => void
+  onSave: (name: string, color: string, storeId: string | null) => void
 }
 
-/** リストの名前とマークの色を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
-function ListEditForm({ initialName, initialColor, onBack, onSave }: ListEditFormProps) {
+/** リストの名前・マークの色・買い物する店舗を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+function ListEditForm({
+  initialName,
+  initialColor,
+  initialStoreId,
+  stores,
+  onBack,
+  onGoToStoreSetup,
+  onSave,
+}: ListEditFormProps) {
   const [name, setName] = useState(initialName)
   const [color, setColor] = useState(initialColor)
+  const [storeId, setStoreId] = useState(initialStoreId)
 
   return (
     <>
@@ -428,7 +406,28 @@ function ListEditForm({ initialName, initialColor, onBack, onSave }: ListEditFor
         ))}
       </div>
 
-      <div className="row" style={{ gap: 8 }}>
+      <label className="field">
+        <span>買い物する店舗</span>
+        <select value={storeId ?? ''} onChange={(e) => setStoreId(e.target.value || null)}>
+          <option value="">（未選択）</option>
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {stores.length === 0 && (
+        <p className="muted" style={{ marginTop: -6 }}>
+          店舗がまだありません。
+          <button type="button" className="btn slim" style={{ margin: '0 4px' }} onClick={onGoToStoreSetup}>
+            お店タブ
+          </button>
+          で追加できます。
+        </p>
+      )}
+
+      <div className="row" style={{ gap: 8, marginTop: 4 }}>
         <button type="button" className="btn" onClick={onBack}>
           戻る
         </button>
@@ -437,7 +436,7 @@ function ListEditForm({ initialName, initialColor, onBack, onSave }: ListEditFor
           className="btn primary"
           style={{ flex: 1 }}
           disabled={!name.trim()}
-          onClick={() => onSave(name.trim(), color)}
+          onClick={() => onSave(name.trim(), color, storeId)}
         >
           保存
         </button>

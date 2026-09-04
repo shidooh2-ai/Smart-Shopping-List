@@ -63,13 +63,15 @@ export function RouteScreen() {
         <div className="empty">
           このリストには店舗が設定されていません。
           <br />
+          「リスト管理」の編集から選べます。
+          <br />
           <button
             type="button"
             className="btn primary"
             style={{ marginTop: 12 }}
             onClick={() => setShoppingView('list')}
           >
-            リスト画面で店舗を選ぶ
+            リスト画面へ
           </button>
         </div>
       </div>
