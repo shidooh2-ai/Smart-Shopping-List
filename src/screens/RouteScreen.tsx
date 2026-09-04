@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
+import { RouteNav } from '../components/RouteNav'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
 import type { RoutePreference, ShoppingItem } from '../types'
@@ -26,6 +27,7 @@ export function RouteScreen() {
   const setSettingsView = useAppStore((s) => s.setSettingsView)
   const [floorId, setFloorId] = useState<string | null>(null)
   const [activeStop, setActiveStop] = useState<number | null>(null)
+  const [navOpen, setNavOpen] = useState(false)
 
   // リストを切り替えたら、前のリストの階/立ち寄り選択を引きずらないようにする
   useEffect(() => {
@@ -260,6 +262,14 @@ export function RouteScreen() {
               doneStopOrders={doneStopOrders}
               height={300}
             />
+            <button
+              type="button"
+              className="btn primary"
+              style={{ width: '100%', marginTop: 8 }}
+              onClick={() => setNavOpen(true)}
+            >
+              ⛶ 全画面でナビ
+            </button>
             <div className="legend">
               <span>
                 <i style={{ background: 'var(--accent)', borderRadius: '50%' }} />
@@ -349,6 +359,19 @@ export function RouteScreen() {
               : 'ルートを作れませんでした。マップに売り場（棚の取り扱いジャンル）が設定されているか確認してください。'}
           </div>
         )
+      )}
+
+      {store && plan && plan.stops.length > 0 && (
+        <RouteNav
+          open={navOpen}
+          store={store}
+          categories={categories}
+          plan={plan}
+          itemById={itemById}
+          doneStopOrders={doneStopOrders}
+          onToggleItem={(itemId, checked) => setItemChecked(list.id, itemId, checked)}
+          onClose={() => setNavOpen(false)}
+        />
       )}
 
       {(unresolvedItems.length > 0 || missingItems.length > 0 || unreachableItems.length > 0) && (

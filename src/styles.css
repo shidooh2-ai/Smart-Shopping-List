@@ -49,6 +49,59 @@
   }
 }
 
+/* ---------- ルートの全画面表示 ----------
+   タブバーなどの下に潜らないよう body 直下にポータルで描画し、
+   実際のビューポート端に position:fixed で直接貼り付ける (.app と同じ考え方)。 */
+.navscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.navscreen > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.navmap {
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-2);
+}
+
+.navpanel {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.navpanel .badge {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--coral);
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navpanel .where {
+  font-weight: 700;
+}
+
 /* ---------- テーマ ----------
    :root だけでなく任意の要素に効くよう、あえて属性セレクタだけで書く。
    設定画面のテーマ見本は <span data-theme="..."> の中で var(--bg) 等を参照して
@@ -730,6 +783,13 @@ label.field > span {
   border-radius: var(--radius-sm);
   overflow: hidden;
   touch-action: none;
+}
+
+.mapwrap.full {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
 }
 
 .mapwrap svg {

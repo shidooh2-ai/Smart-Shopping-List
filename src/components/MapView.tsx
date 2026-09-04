@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { idx } from '../lib/grid'
+import type { CellArea } from '../lib/navSteps'
 import { CELL, NODE_STYLE, readableText, shelfColor } from '../lib/mapStyle'
 import type { Category, Floor, Pos, RoutePlan, StoreMap } from '../types'
 
@@ -39,6 +40,15 @@ export interface MapViewProps {
    * 背景画像と見比べられるよう、背景画像の透明度とは別に下げられるようにする。
    */
   overlayOpacity?: number
+  /** 高さを親要素いっぱいに広げる (全画面ナビ用)。指定すると height は無視する */
+  fullBleed?: boolean
+  /** 拡大縮小バーを表示するか */
+  showZoomBar?: boolean
+  /**
+   * この範囲 (マス単位) がちょうど収まるよう、なめらかに寄せる。
+   * 手動で操作するとその時点で寄せは止まる。
+   */
+  focusArea?: CellArea | null
 }
 
 interface Pointer {
@@ -71,6 +81,9 @@ export function MapView({
   backgroundImage,
   backgroundOpacity = 0.35,
   overlayOpacity = 1,
+  fullBleed = false,
+  showZoomBar = true,
+  focusArea = null,
 }: MapViewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pointers = useRef(new Map<number, Pointer>())
@@ -79,9 +92,34 @@ export function MapView({
   const moved = useRef(false)
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
   const [dragCell, setDragCell] = useState<CellPos | null>(null)
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const animation = useRef<number | null>(null)
 
-  const viewW = floor.width * CELL
-  const viewH = floor.height * CELL
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [boxRatio, setBoxRatio] = useState<number | null>(null)
+
+  /** 地図そのものの大きさ (SVG座標) */
+  const mapW = floor.width * CELL
+  const mapH = floor.height * CELL
+
+  // 全画面表示では、SVGの表示領域を画面と同じ縦横比にして上下の余白 (レターボックス) を無くす。
+  // こうしないと、縦長の画面では地図が中央に小さく収まってしまい、文字が読みにくいままになる。
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!fullBleed || !el) return
+    const measure = () => {
+      if (el.clientWidth > 0) setBoxRatio(el.clientHeight / el.clientWidth)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [fullBleed])
+
+  /** 表示領域の大きさ (SVG座標)。通常表示では地図と同じ */
+  const viewW = mapW
+  const viewH = fullBleed && boxRatio ? mapW * boxRatio : mapH
 
   /** クライアント座標を地図座標 (マス単位) に変換する */
   const toCell = useCallback(
@@ -103,16 +141,55 @@ export function MapView({
 
   const clamp = (v: { scale: number; tx: number; ty: number }) => {
     const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale))
-    const spanX = viewW * scale
-    const spanY = viewH * scale
-    const minTx = Math.min(0, viewW - spanX)
-    const minTy = Math.min(0, viewH - spanY)
+    const spanX = mapW * scale
+    const spanY = mapH * scale
+    // 地図が表示領域より大きいときは端が内側に入らないように、
+    // 小さいときは表示領域からはみ出さないように収める
+    const loX = Math.min(0, viewW - spanX)
+    const hiX = Math.max(0, viewW - spanX)
+    const loY = Math.min(0, viewH - spanY)
+    const hiY = Math.max(0, viewH - spanY)
     return {
       scale,
-      tx: Math.min(Math.max(v.tx, minTx), Math.max(0, viewW - spanX) || 0),
-      ty: Math.min(Math.max(v.ty, minTy), Math.max(0, viewH - spanY) || 0),
+      tx: Math.min(Math.max(v.tx, loX), hiX),
+      ty: Math.min(Math.max(v.ty, loY), hiY),
     }
   }
+
+  /** 地図全体がちょうど収まる表示 */
+  const fitAll = useCallback(() => {
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(viewW / mapW, viewH / mapH)))
+    return { scale, tx: (viewW - mapW * scale) / 2, ty: (viewH - mapH * scale) / 2 }
+  }, [mapH, mapW, viewH, viewW])
+
+  const stopAnimation = useCallback(() => {
+    if (animation.current !== null) {
+      cancelAnimationFrame(animation.current)
+      animation.current = null
+    }
+  }, [])
+
+  /** 現在の表示から目標の表示へ、イージングを効かせてなめらかに動かす。 */
+  const animateTo = useCallback(
+    (target: { scale: number; tx: number; ty: number }, durationMs = 620) => {
+      stopAnimation()
+      const from = viewRef.current
+      const started = performance.now()
+      const step = (now: number) => {
+        const t = Math.min(1, (now - started) / durationMs)
+        // easeInOutCubic — 動き出しと止まりが緩やかで、地図の移動が追いやすい
+        const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+        setView({
+          scale: from.scale + (target.scale - from.scale) * e,
+          tx: from.tx + (target.tx - from.tx) * e,
+          ty: from.ty + (target.ty - from.ty) * e,
+        })
+        animation.current = t < 1 ? requestAnimationFrame(step) : null
+      }
+      animation.current = requestAnimationFrame(step)
+    },
+    [stopAnimation],
+  )
 
   /** dragStart〜dragCell の矩形に含まれる全マスを返す (point モードなら1マスのみ)。 */
   const rectCells = (a: CellPos, b: CellPos): CellPos[] => {
@@ -130,6 +207,8 @@ export function MapView({
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    // 触った時点で自動の寄せは中断し、手の操作を優先する
+    stopAnimation()
 
     if (onPaint) {
       // 配置ツール (選択ツール以外) では拡大縮小・移動を一切行わない。
@@ -242,6 +321,33 @@ export function MapView({
       }),
     )
 
+  // 寄せる範囲が変わるたび、その範囲がちょうど収まる位置・倍率へ動かす。
+  // 依存配列に入れるため、範囲は数値をつないだ文字列で比較する。
+  const focusKey = focusArea ? `${focusArea.x0},${focusArea.y0},${focusArea.x1},${focusArea.y1}` : null
+  useEffect(() => {
+    if (!focusArea) {
+      // 全画面で寄せ先が無いときは地図全体を表示する
+      if (fullBleed && boxRatio) animateTo(fitAll())
+      return
+    }
+    const pad = CELL * 0.9
+    const x = focusArea.x0 * CELL - pad
+    const y = focusArea.y0 * CELL - pad
+    const w = (focusArea.x1 - focusArea.x0 + 1) * CELL + pad * 2
+    const h = (focusArea.y1 - focusArea.y0 + 1) * CELL + pad * 2
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(viewW / w, viewH / h)))
+    animateTo(
+      clamp({
+        scale,
+        tx: viewW / 2 - (x + w / 2) * scale,
+        ty: viewH / 2 - (y + h / 2) * scale,
+      }),
+    )
+    return stopAnimation
+    // focusKey は focusArea の中身そのもの。clamp/animateTo は毎回同じ動作をする
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, viewW, viewH, fullBleed, boxRatio])
+
   // --- 描画データ ---
   /** 棚名を、その棚の形に収まるサイズ・向きで置く */
   const shelfLabels = useMemo(() => {
@@ -315,7 +421,11 @@ export function MapView({
 
   return (
     <>
-    <div className="mapwrap" style={{ aspectRatio: `${viewW} / ${viewH}`, maxHeight: height }}>
+    <div
+      ref={wrapRef}
+      className={`mapwrap${fullBleed ? ' full' : ''}`}
+      style={fullBleed ? undefined : { aspectRatio: `${viewW} / ${viewH}`, maxHeight: height }}
+    >
       <svg
         ref={svgRef}
         viewBox={`0 0 ${viewW} ${viewH}`}
@@ -516,6 +626,7 @@ export function MapView({
       </svg>
 
     </div>
+    {showZoomBar && (
     <div className="zoombar">
       <button type="button" className="btn slim" onClick={() => zoomBy(1 / 1.4)} aria-label="縮小">
         −
@@ -526,7 +637,7 @@ export function MapView({
       <button
         type="button"
         className="btn slim"
-        onClick={() => setView({ scale: 1, tx: 0, ty: 0 })}
+        onClick={() => setView(fullBleed ? fitAll() : { scale: 1, tx: 0, ty: 0 })}
         aria-label="表示をリセット"
       >
         全体表示
@@ -535,6 +646,7 @@ export function MapView({
         {Math.round(view.scale * 100)}%
       </span>
     </div>
+    )}
     </>
   )
 }
