@@ -42,12 +42,3 @@ export function GenreGlyph({ size = 22, color = 'currentColor', strokeWidth = 2.
     </svg>
   )
 }
-
-export function BasketGlyph({ size = 19, color = '#ffffff', strokeWidth = 2.2 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 3l1 6M9 3l0 6M12 3l-1 6M6 9c0 3-2 4-2 8a3 3 0 0 0 3 3h9a3 3 0 0 0 1-5.83" />
-      <path d="M9 21a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17 21a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z" />
-    </svg>
-  )
-}

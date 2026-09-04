@@ -56,7 +56,6 @@ html,
 body,
 #root {
   height: 100%;
-  height: 100dvh;
   overflow: hidden;
 }
 
@@ -79,109 +78,20 @@ textarea {
   color: inherit;
 }
 
-/* ---------- レイアウト ---------- */
+/* ---------- レイアウト ----------
+   .app は position:fixed + inset:0 で実際のビューポート端に直接固定する。
+   100dvh を使った高さ計算は、実機のWKWebViewでは safe area の変化時に
+   ずれることがあり、画面の一部がヘッダーやフッターの裏に隠れたまま
+   スクロールしても届かなくなる不具合の原因になっていたため。 */
 .app {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  height: 100dvh;
   max-width: 640px;
   margin: 0 auto;
   background: var(--bg);
   overflow: hidden;
-}
-
-.appbar {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 10px;
-  background: var(--bg);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.appbar .eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.appbar .badge {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-
-.appbar .store {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.appbar .titlerow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.appbar h1 {
-  font-size: 26px;
-  font-weight: 800;
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.appbar .sub {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.appbar .sub.count {
-  color: var(--accent);
-}
-
-.appbar .progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.appbar .progress .track {
-  flex: 1;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--accent-weak);
-  overflow: hidden;
-}
-
-.appbar .progress .fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--accent);
-  transition: width 0.2s ease-out;
-}
-
-.appbar .progress .frac {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-dim);
-  white-space: nowrap;
 }
 
 .screen {
@@ -190,7 +100,7 @@ textarea {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 12px 24px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px 24px;
 }
 
 .tabbar {
@@ -201,6 +111,18 @@ textarea {
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  overflow: hidden;
+  max-height: 120px;
+  opacity: 1;
+  transition: max-height 0.22s ease, padding-top 0.22s ease, padding-bottom 0.22s ease, opacity 0.18s ease;
+}
+
+.tabbar.hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .tabbar button {
