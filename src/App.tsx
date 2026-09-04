@@ -14,9 +14,16 @@ const TABS: Array<{ id: Tab; label: string; Icon: typeof ListGlyph }> = [
   { id: 'genre', label: 'ジャンル', Icon: GenreGlyph },
 ]
 
-/** スクロール方向に応じてタブバーを自動的に隠す/表示するしきい値 (px)。 */
-const HIDE_THRESHOLD = 8
+/**
+ * スクロール方向に応じてタブバーを自動的に隠す/表示するしきい値 (px)。
+ * 状態が切り替わるたびに累積量をリセットする「ヒステリシス」方式にすることで、
+ * iOSのバウンス(ラバーバンド)スクロールで scrollTop が細かく前後した際に
+ * 表示/非表示が連続で切り替わってチラつくのを防ぐ。
+ */
+const HIDE_ACCUM = 28
+const SHOW_ACCUM = 28
 const NEAR_TOP = 8
+const NEAR_BOTTOM = 2
 
 export default function App() {
   const tab = useAppStore((s) => s.tab)
@@ -24,6 +31,7 @@ export default function App() {
   const [tabbarHidden, setTabbarHidden] = useState(false)
   const mainRef = useRef<HTMLElement | null>(null)
   const lastScrollTop = useRef(0)
+  const accumDelta = useRef(0)
 
   useEffect(() => {
     startCloudSyncBridge()
@@ -32,26 +40,62 @@ export default function App() {
   // タブを切り替えたら、前の画面のスクロール位置を引きずらないようにリセットする。
   useEffect(() => {
     lastScrollTop.current = 0
+    accumDelta.current = 0
     setTabbarHidden(false)
   }, [tab])
 
   useEffect(() => {
     const mainEl = mainRef.current
     if (!mainEl) return
-    const handleScroll = (e: Event) => {
-      const target = e.target
-      if (!(target instanceof HTMLElement)) return
-      const current = target.scrollTop
+    let target: HTMLElement | null = null
+    let rafId: number | null = null
+
+    const process = () => {
+      rafId = null
+      if (!target) return
+      // ラバーバンド(バウンス)スクロールでは scrollTop が実際の可動域を
+      // 超えて負の値や scrollHeight 超えの値になることがあるため、可動域に
+      // クランプしてから差分を取る。そうしないと端で跳ね返るたびに
+      // 上下スクロールと誤認してタブバーが点滅してしまう。
+      const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight)
+      const current = Math.min(Math.max(target.scrollTop, 0), maxScroll)
       const delta = current - lastScrollTop.current
-      if (current <= NEAR_TOP) setTabbarHidden(false)
-      else if (delta > HIDE_THRESHOLD) setTabbarHidden(true)
-      else if (delta < -HIDE_THRESHOLD) setTabbarHidden(false)
       lastScrollTop.current = current
+
+      if (current <= NEAR_TOP || current >= maxScroll - NEAR_BOTTOM) {
+        accumDelta.current = 0
+        setTabbarHidden(false)
+        return
+      }
+
+      if ((delta > 0 && accumDelta.current < 0) || (delta < 0 && accumDelta.current > 0)) {
+        accumDelta.current = 0
+      }
+      accumDelta.current += delta
+
+      if (accumDelta.current > HIDE_ACCUM) {
+        setTabbarHidden(true)
+        accumDelta.current = 0
+      } else if (accumDelta.current < -SHOW_ACCUM) {
+        setTabbarHidden(false)
+        accumDelta.current = 0
+      }
     }
+
+    const handleScroll = (e: Event) => {
+      if (!(e.target instanceof HTMLElement)) return
+      target = e.target
+      // 1フレームに1回だけ計算し、バーストするscrollイベントによるチラつきを抑える。
+      if (rafId == null) rafId = requestAnimationFrame(process)
+    }
+
     // `.screen` (各画面が持つスクロール要素) の scroll イベントは bubbling しないため、
     // capture フェーズで拾う。
     mainEl.addEventListener('scroll', handleScroll, { capture: true, passive: true })
-    return () => mainEl.removeEventListener('scroll', handleScroll, true)
+    return () => {
+      mainEl.removeEventListener('scroll', handleScroll, true)
+      if (rafId != null) cancelAnimationFrame(rafId)
+    }
   }, [])
 
   return (
