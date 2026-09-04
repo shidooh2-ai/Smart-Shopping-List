@@ -92,17 +92,17 @@ export function RouteScreen() {
   /** ルートに含められない品目の行。灰色の破線表示のまま、チェック(購入)はできるようにする。 */
   const renderUnroutedRow = (item: ShoppingItem, dotColor: string, reason: string) => (
     <li key={item.id} className={`unrouted${item.checked ? ' done' : ''}`}>
-      <span className="dot" style={{ background: dotColor }} />
-      <span className="grow">
-        <span className="title">{item.text}</span>
-        <span className="muted">{reason}</span>
-      </span>
       <input
         type="checkbox"
         checked={item.checked}
         onChange={(e) => setItemChecked(list.id, item.id, e.target.checked)}
         aria-label={`${item.text} を購入済みにする`}
       />
+      <span className="dot" style={{ background: dotColor }} />
+      <span className="grow">
+        <span className="title">{item.text}</span>
+        <span className="muted">{reason}</span>
+      </span>
     </li>
   )
 
