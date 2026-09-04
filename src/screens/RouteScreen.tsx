@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { planRoute, routeMetrics } from '../lib/route'
@@ -19,14 +19,26 @@ const SHOPPING_VIEWS = [
 export function RouteScreen() {
   const list = useActiveList()
   const store = useListStore(list)
+  const lists = useAppStore((s) => s.lists)
+  const stores = useAppStore((s) => s.stores)
   const categories = useAppStore((s) => s.categories)
   const setShoppingView = useAppStore((s) => s.setShoppingView)
+  const setActiveList = useAppStore((s) => s.setActiveList)
+  const setListStore = useAppStore((s) => s.setListStore)
   const setItemChecked = useAppStore((s) => s.setItemChecked)
   const markPurchased = useAppStore((s) => s.markPurchased)
   const routePreference = useAppStore((s) => s.routePreference)
   const setRoutePreference = useAppStore((s) => s.setRoutePreference)
+  const setTab = useAppStore((s) => s.setTab)
+  const setStoreView = useAppStore((s) => s.setStoreView)
   const [floorId, setFloorId] = useState<string | null>(null)
   const [activeStop, setActiveStop] = useState<number | null>(null)
+
+  // リストを切り替えたら、前のリストの階/立ち寄り選択を引きずらないようにする
+  useEffect(() => {
+    setFloorId(null)
+    setActiveStop(null)
+  }, [list?.id])
 
   const plan = useMemo(
     () => (store && list ? planRoute(store, list.items, routePreference) : null),
@@ -56,35 +68,16 @@ export function RouteScreen() {
     )
   }
 
-  if (!store) {
-    return (
-      <div className="screen">
-        <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
-        <div className="empty">
-          このリストには店舗が設定されていません。
-          <br />
-          「リスト管理」の編集から選べます。
-          <br />
-          <button
-            type="button"
-            className="btn primary"
-            style={{ marginTop: 12 }}
-            onClick={() => setShoppingView('list')}
-          >
-            リスト画面へ
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const shownFloor = store
+    ? (store.floors.find((f) => f.id === floorId) ??
+      store.floors.find(
+        (f) => f.id === (plan?.stops.find((s) => s.order === activeStop)?.pos.floorId ?? plan?.stops[0]?.pos.floorId),
+      ) ??
+      store.floors.find((f) => f.id === plan?.start?.floorId) ??
+      store.floors[0])
+    : null
 
-  const shownFloor =
-    store.floors.find((f) => f.id === floorId) ??
-    store.floors.find((f) => f.id === (plan?.stops.find((s) => s.order === activeStop)?.pos.floorId ?? plan?.stops[0]?.pos.floorId)) ??
-    store.floors.find((f) => f.id === plan?.start?.floorId) ??
-    store.floors[0]
-
-  const metrics = plan ? routeMetrics(plan, store.cellMeters) : null
+  const metrics = plan && store ? routeMetrics(plan, store.cellMeters) : null
   const catName = (id: string) => byId.get(id)?.name ?? '不明なジャンル'
 
   const unresolved = plan?.unresolvedItemIds ?? []
@@ -98,9 +91,9 @@ export function RouteScreen() {
   const missingItems = byCategoryItems(missing)
   const unreachableItems = byCategoryItems(unreachable)
 
-  const hasStairs = store.nodes.some((n) => n.kind === 'stairs')
-  const hasElevator = store.nodes.some((n) => n.kind === 'elevator')
-  const showPreference = store.floors.length > 1 && hasStairs && hasElevator
+  const hasStairs = store?.nodes.some((n) => n.kind === 'stairs') ?? false
+  const hasElevator = store?.nodes.some((n) => n.kind === 'elevator') ?? false
+  const showPreference = (store?.floors.length ?? 0) > 1 && hasStairs && hasElevator
 
   const checkedItemIds = list.items.filter((i) => i.checked).map((i) => i.id)
   const checkoutToPurchased = () => {
@@ -130,6 +123,57 @@ export function RouteScreen() {
   return (
     <div className="screen">
       <ViewSwitch options={SHOPPING_VIEWS} active="route" onChange={setShoppingView} />
+
+      <div className="card">
+        <label className="field">
+          <span>買い物リスト</span>
+          <select value={list.id} onChange={(e) => setActiveList(e.target.value)}>
+            {lists.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field" style={{ marginBottom: 0 }}>
+          <span>買い物する店舗</span>
+          <select
+            value={list.storeId ?? ''}
+            onChange={(e) => setListStore(list.id, e.target.value || null)}
+          >
+            <option value="">（未選択）</option>
+            {stores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {stores.length === 0 && (
+          <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
+            店舗がまだありません。
+            <button
+              type="button"
+              className="btn slim"
+              style={{ margin: '0 4px' }}
+              onClick={() => {
+                setStoreView('map')
+                setTab('store')
+              }}
+            >
+              お店タブ
+            </button>
+            で追加できます。
+          </p>
+        )}
+      </div>
+
+      {!store && (
+        <div className="empty">
+          このリストには店舗が設定されていません。上で店舗を選んでください。
+        </div>
+      )}
+
       {showPreference && (
         <div className="card">
           <h2>階段・エレベーターの優先</h2>
@@ -197,7 +241,7 @@ export function RouteScreen() {
         </div>
       )}
 
-      {plan && plan.stops.length > 0 && shownFloor ? (
+      {store && plan && plan.stops.length > 0 && shownFloor ? (
         <>
           <div className="card">
             {store.floors.length > 1 && (
@@ -308,11 +352,13 @@ export function RouteScreen() {
           </div>
         </>
       ) : (
-        <div className="empty">
-          {list.items.length === 0
-            ? '買うものがありません。リストに追加してください。'
-            : 'ルートを作れませんでした。マップに売り場（棚の取り扱いジャンル）が設定されているか確認してください。'}
-        </div>
+        store && (
+          <div className="empty">
+            {list.items.length === 0
+              ? '買うものがありません。リストに追加してください。'
+              : 'ルートを作れませんでした。マップに売り場（棚の取り扱いジャンル）が設定されているか確認してください。'}
+          </div>
+        )
       )}
 
       {(unresolvedItems.length > 0 || missingItems.length > 0 || unreachableItems.length > 0) && (

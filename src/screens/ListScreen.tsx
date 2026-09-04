@@ -6,7 +6,7 @@ import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { useActiveList, useAppStore } from '../store/useAppStore'
-import type { Category, CloudLink, ShoppingItem, StoreMap } from '../types'
+import type { Category, CloudLink, ShoppingItem } from '../types'
 
 const SHOPPING_VIEWS = [
   { id: 'list' as const, label: 'リスト' },
@@ -19,7 +19,6 @@ type ListSheetMode = { kind: 'menu' } | { kind: 'edit'; listId: string } | { kin
 export function ListScreen() {
   const list = useActiveList()
   const categories = useAppStore((s) => s.categories)
-  const stores = useAppStore((s) => s.stores)
   const lists = useAppStore((s) => s.lists)
   const {
     addItems,
@@ -31,14 +30,11 @@ export function ListScreen() {
     uncheckAll,
     redetectCategories,
     markPurchased,
-    setListStore,
     createList,
     deleteList,
     updateList,
     setActiveList,
-    setTab,
     setShoppingView,
-    setStoreView,
     shareList,
     unshareList,
   } = useAppStore()
@@ -309,20 +305,12 @@ export function ListScreen() {
                 key={target.id}
                 initialName={target.name}
                 initialColor={target.color ?? PALETTE[0]}
-                initialStoreId={target.storeId}
-                stores={stores}
                 cloud={target.cloud}
                 onShare={() => shareList(target.id)}
                 onUnshare={() => unshareList(target.id)}
                 onBack={() => setListSheetMode({ kind: 'menu' })}
-                onGoToStoreSetup={() => {
-                  setStoreView('map')
-                  setTab('store')
-                  setListSheetMode(null)
-                }}
-                onSave={(name, color, storeId) => {
+                onSave={(name, color) => {
                   updateList(target.id, { name, color })
-                  setListStore(target.id, storeId)
                   setListSheetMode({ kind: 'menu' })
                 }}
               />
@@ -333,17 +321,9 @@ export function ListScreen() {
           <ListEditForm
             initialName={`買い物リスト ${lists.length + 1}`}
             initialColor={PALETTE[lists.length % PALETTE.length]}
-            initialStoreId={null}
-            stores={stores}
             onBack={() => setListSheetMode({ kind: 'menu' })}
-            onGoToStoreSetup={() => {
-              setStoreView('map')
-              setTab('store')
-              setListSheetMode(null)
-            }}
-            onSave={(name, color, storeId) => {
-              const id = createList(name, color)
-              setListStore(id, storeId)
+            onSave={(name, color) => {
+              createList(name, color)
               setListSheetMode(null)
             }}
           />
@@ -356,33 +336,18 @@ export function ListScreen() {
 interface ListEditFormProps {
   initialName: string
   initialColor: string
-  initialStoreId: string | null
-  stores: StoreMap[]
   /** 既存リストの編集時のみ渡す (新規作成時は保存前なので共有できない) */
   cloud?: CloudLink
   onShare?: () => Promise<void>
   onUnshare?: () => Promise<void>
   onBack: () => void
-  onGoToStoreSetup: () => void
-  onSave: (name: string, color: string, storeId: string | null) => void
+  onSave: (name: string, color: string) => void
 }
 
-/** リストの名前・マークの色・買い物する店舗・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
-function ListEditForm({
-  initialName,
-  initialColor,
-  initialStoreId,
-  stores,
-  cloud,
-  onShare,
-  onUnshare,
-  onBack,
-  onGoToStoreSetup,
-  onSave,
-}: ListEditFormProps) {
+/** リストの名前・マークの色・共有を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+function ListEditForm({ initialName, initialColor, cloud, onShare, onUnshare, onBack, onSave }: ListEditFormProps) {
   const [name, setName] = useState(initialName)
   const [color, setColor] = useState(initialColor)
-  const [storeId, setStoreId] = useState(initialStoreId)
 
   return (
     <>
@@ -411,27 +376,6 @@ function ListEditForm({
         ))}
       </div>
 
-      <label className="field">
-        <span>買い物する店舗</span>
-        <select value={storeId ?? ''} onChange={(e) => setStoreId(e.target.value || null)}>
-          <option value="">（未選択）</option>
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {stores.length === 0 && (
-        <p className="muted" style={{ marginTop: -6 }}>
-          店舗がまだありません。
-          <button type="button" className="btn slim" style={{ margin: '0 4px' }} onClick={onGoToStoreSetup}>
-            お店タブ
-          </button>
-          で追加できます。
-        </p>
-      )}
-
       {onShare && onUnshare && <CloudShareSection cloud={cloud} onShare={onShare} onUnshare={onUnshare} />}
 
       <div className="row" style={{ gap: 8, marginTop: 4 }}>
@@ -443,7 +387,7 @@ function ListEditForm({
           className="btn primary"
           style={{ flex: 1 }}
           disabled={!name.trim()}
-          onClick={() => onSave(name.trim(), color, storeId)}
+          onClick={() => onSave(name.trim(), color)}
         >
           保存
         </button>
