@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { CloudSync, type CloudSyncItem } from '../lib/cloudSync'
 import { cloneDefaultCategories } from '../data/categories'
+import { PALETTE } from '../data/palette'
 import { createSampleStore } from '../data/sampleStore'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
 import { idx, makeCells, pruneOrphans } from '../lib/grid'
@@ -71,9 +72,9 @@ export interface AppState {
   setScreenWakeLockEnabled: (enabled: boolean) => void
 
   // --- 買い物リスト ---
-  createList: (name?: string) => string
+  createList: (name?: string, color?: string) => string
   deleteList: (listId: string) => void
-  renameList: (listId: string, name: string) => void
+  updateList: (listId: string, patch: { name?: string; color?: string }) => void
   setActiveList: (listId: string) => void
   setListStore: (listId: string, storeId: string | null) => void
   addItems: (listId: string, text: string) => void
@@ -161,9 +162,17 @@ export interface AppState {
   pushCloudChanges: () => Promise<void>
 }
 
-function createInitialList(storeId: string | null): ShoppingList {
+function createInitialList(storeId: string | null, name?: string, color?: string): ShoppingList {
   const now = Date.now()
-  return { id: newId('list'), name: '買い物リスト', storeId, items: [], createdAt: now, updatedAt: now }
+  return {
+    id: newId('list'),
+    name: name ?? '買い物リスト',
+    color: color ?? PALETTE[0],
+    storeId,
+    items: [],
+    createdAt: now,
+    updatedAt: now,
+  }
 }
 
 function initialState() {
@@ -289,10 +298,9 @@ export const useAppStore = create<AppState>()(
       setScreenWakeLockEnabled: (screenWakeLockEnabled) => set({ screenWakeLockEnabled }),
 
       // --- 買い物リスト ---
-      createList: (name) => {
-        const stores = get().stores
-        const list = createInitialList(stores[0]?.id ?? null)
-        if (name) list.name = name
+      createList: (name, color) => {
+        const { stores, lists } = get()
+        const list = createInitialList(stores[0]?.id ?? null, name, color ?? PALETTE[lists.length % PALETTE.length])
         set((s) => ({ lists: [...s.lists, list], activeListId: list.id }))
         return list.id
       },
@@ -304,7 +312,7 @@ export const useAppStore = create<AppState>()(
           return { lists, activeListId }
         }),
 
-      renameList: (listId, name) => set((s) => ({ lists: mapList(s.lists, listId, (l) => ({ ...l, name })) })),
+      updateList: (listId, patch) => set((s) => ({ lists: mapList(s.lists, listId, (l) => ({ ...l, ...patch })) })),
 
       setActiveList: (listId) => set({ activeListId: listId }),
 

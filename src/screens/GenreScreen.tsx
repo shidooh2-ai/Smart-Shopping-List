@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
+import { PALETTE } from '../data/palette'
 import { buildIndex, detectCategory } from '../lib/genre'
 import { useAppStore } from '../store/useAppStore'
 import type { Category } from '../types'
@@ -8,12 +9,6 @@ import type { Category } from '../types'
 const STORE_VIEWS = [
   { id: 'map' as const, label: 'マップ' },
   { id: 'genre' as const, label: 'ジャンル' },
-]
-
-const PALETTE = [
-  '#7cb342', '#ef6c00', '#d84315', '#0288d1', '#f9a825', '#a1887f', '#8d6e63', '#fdd835',
-  '#4db6ac', '#4fc3f7', '#ff7043', '#bcaaa4', '#90a4ae', '#ffb300', '#ec407a', '#29b6f6',
-  '#7e57c2', '#78909c', '#26a69a', '#ab47bc', '#f06292', '#6d4c41', '#66bb6a', '#5c6bc0',
 ]
 
 export function GenreScreen() {

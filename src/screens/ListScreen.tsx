@@ -5,6 +5,7 @@ import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
+import { PALETTE } from '../data/palette'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, ShoppingItem } from '../types'
 
@@ -12,6 +13,9 @@ const SHOPPING_VIEWS = [
   { id: 'list' as const, label: 'リスト' },
   { id: 'route' as const, label: 'ルート' },
 ]
+
+/** 「リスト管理」シート内の表示状態。一覧か、既存/新規リストの名前・色編集か。 */
+type ListSheetMode = { kind: 'menu' } | { kind: 'edit'; listId: string } | { kind: 'new' }
 
 export function ListScreen() {
   const list = useActiveList()
@@ -31,7 +35,7 @@ export function ListScreen() {
     setListStore,
     createList,
     deleteList,
-    renameList,
+    updateList,
     setActiveList,
     setTab,
     setShoppingView,
@@ -45,7 +49,7 @@ export function ListScreen() {
   const [draft, setDraft] = useState('')
   const [grouped, setGrouped] = useState(true)
   const [pickerItem, setPickerItem] = useState<string | null>(null)
-  const [listSheet, setListSheet] = useState(false)
+  const [listSheetMode, setListSheetMode] = useState<ListSheetMode | null>(null)
   const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [purchasedSheet, setPurchasedSheet] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -97,11 +101,14 @@ export function ListScreen() {
       <ViewSwitch options={SHOPPING_VIEWS} active="list" onChange={setShoppingView} />
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
+          <span
+            style={{ width: 14, height: 14, borderRadius: '50%', background: list.color ?? 'var(--outline)', flex: 'none' }}
+          />
           <strong style={{ flex: 1, minWidth: 0 }}>{list.name}</strong>
           <button type="button" className="btn slim" onClick={() => setPurchasedSheet(true)}>
             🧾 購入済み
           </button>
-          <button type="button" className="btn slim" onClick={() => setListSheet(true)}>
+          <button type="button" className="btn slim" onClick={() => setListSheetMode({ kind: 'menu' })}>
             リスト管理
           </button>
         </div>
@@ -276,53 +283,166 @@ export function ListScreen() {
         onClose={() => setPickerItem(null)}
       />
 
-      <Sheet open={listSheet} title="リスト管理" onClose={() => setListSheet(false)}>
-        <label className="field">
-          <span>このリストの名前</span>
-          <input type="text" value={list.name} onChange={(e) => renameList(list.id, e.target.value)} />
-        </label>
-        <CloudShareSection
-          cloud={list.cloud}
-          onShare={() => shareList(list.id)}
-          onUnshare={() => unshareList(list.id)}
-        />
-        <ul className="list-rows">
-          {lists.map((l) => (
-            <li key={l.id}>
-              <button
-                type="button"
-                className="btn slim"
-                style={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left' }}
-                aria-pressed={l.id === list.id}
-                onClick={() => {
-                  setActiveList(l.id)
-                  setListSheet(false)
+      <Sheet
+        open={listSheetMode !== null}
+        title={
+          listSheetMode?.kind === 'new' ? '新しいリストを作る' : listSheetMode?.kind === 'edit' ? 'リストの編集' : 'リスト管理'
+        }
+        onClose={() => setListSheetMode(null)}
+      >
+        {listSheetMode?.kind === 'menu' && (
+          <>
+            <CloudShareSection
+              cloud={list.cloud}
+              onShare={() => shareList(list.id)}
+              onUnshare={() => unshareList(list.id)}
+            />
+            <ul className="list-rows">
+              {lists.map((l) => (
+                <li key={l.id}>
+                  <button
+                    type="button"
+                    className="btn slim"
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      justifyContent: 'flex-start',
+                      textAlign: 'left',
+                    }}
+                    aria-pressed={l.id === list.id}
+                    onClick={() => {
+                      setActiveList(l.id)
+                      setListSheetMode(null)
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: l.color ?? 'var(--outline)',
+                        flex: 'none',
+                      }}
+                    />
+                    {l.id === list.id ? '● ' : '　'}
+                    {l.name}（{l.items.filter((i) => !i.checked).length}件）
+                  </button>
+                  <button
+                    type="button"
+                    className="btn slim"
+                    onClick={() => setListSheetMode({ kind: 'edit', listId: l.id })}
+                  >
+                    編集
+                  </button>
+                  {lists.length > 1 && (
+                    <button type="button" className="btn slim danger" onClick={() => deleteList(l.id)}>
+                      削除
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ width: '100%', marginTop: 12 }}
+              onClick={() => setListSheetMode({ kind: 'new' })}
+            >
+              新しいリストを作る
+            </button>
+          </>
+        )}
+
+        {listSheetMode?.kind === 'edit' &&
+          (() => {
+            const target = lists.find((l) => l.id === listSheetMode.listId)
+            if (!target) return null
+            return (
+              <ListEditForm
+                key={target.id}
+                initialName={target.name}
+                initialColor={target.color ?? PALETTE[0]}
+                onBack={() => setListSheetMode({ kind: 'menu' })}
+                onSave={(name, color) => {
+                  updateList(target.id, { name, color })
+                  setListSheetMode({ kind: 'menu' })
                 }}
-              >
-                {l.id === list.id ? '● ' : '　'}
-                {l.name}（{l.items.filter((i) => !i.checked).length}件）
-              </button>
-              {lists.length > 1 && (
-                <button type="button" className="btn slim danger" onClick={() => deleteList(l.id)}>
-                  削除
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+              />
+            )
+          })()}
+
+        {listSheetMode?.kind === 'new' && (
+          <ListEditForm
+            initialName={`買い物リスト ${lists.length + 1}`}
+            initialColor={PALETTE[lists.length % PALETTE.length]}
+            onBack={() => setListSheetMode({ kind: 'menu' })}
+            onSave={(name, color) => {
+              createList(name, color)
+              setListSheetMode(null)
+            }}
+          />
+        )}
+      </Sheet>
+    </div>
+  )
+}
+
+interface ListEditFormProps {
+  initialName: string
+  initialColor: string
+  onBack: () => void
+  onSave: (name: string, color: string) => void
+}
+
+/** リストの名前とマークの色を編集するフォーム。新規作成・既存リストの編集の両方で使う。 */
+function ListEditForm({ initialName, initialColor, onBack, onSave }: ListEditFormProps) {
+  const [name, setName] = useState(initialName)
+  const [color, setColor] = useState(initialColor)
+
+  return (
+    <>
+      <label className="field">
+        <span>リスト名</span>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+
+      <span className="muted">マークの色</span>
+      <div className="row wrap" style={{ margin: '6px 0 14px' }}>
+        {PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`色 ${c}`}
+            onClick={() => setColor(c)}
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: c,
+              border: color === c ? '3px solid var(--text)' : '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn" onClick={onBack}>
+          戻る
+        </button>
         <button
           type="button"
           className="btn primary"
-          style={{ width: '100%', marginTop: 12 }}
-          onClick={() => {
-            createList(`買い物リスト ${lists.length + 1}`)
-            setListSheet(false)
-          }}
+          style={{ flex: 1 }}
+          disabled={!name.trim()}
+          onClick={() => onSave(name.trim(), color)}
         >
-          新しいリストを作る
+          保存
         </button>
-      </Sheet>
-    </div>
+      </div>
+    </>
   )
 }
 

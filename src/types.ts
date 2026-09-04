@@ -80,6 +80,8 @@ export interface ShoppingItem {
 export interface ShoppingList {
   id: string
   name: string
+  /** リストを見分けるためのマークの色 */
+  color?: string
   storeId: string | null
   items: ShoppingItem[]
   createdAt: number
