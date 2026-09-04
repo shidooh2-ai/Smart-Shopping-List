@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
-import type { RoutePreference } from '../types'
+import type { RoutePreference, ShoppingItem } from '../types'
 
 const PREFERENCE_OPTIONS: Array<{ id: RoutePreference; label: string }> = [
   { id: 'balanced', label: 'バランス' },
@@ -69,6 +69,13 @@ export function RouteScreen() {
   const unresolved = plan?.unresolvedItemIds ?? []
   const missing = plan?.missingCategoryIds ?? []
   const unreachable = plan?.unreachableCategoryIds ?? []
+
+  // ルートに含められない品目 (未購入分) も、理由つきで一覧には出しておく。
+  const unresolvedItems = unresolved.map((id) => itemById.get(id)).filter((i): i is ShoppingItem => !!i)
+  const byCategoryItems = (categoryIds: string[]) =>
+    list.items.filter((i) => !i.checked && i.categoryId && categoryIds.includes(i.categoryId))
+  const missingItems = byCategoryItems(missing)
+  const unreachableItems = byCategoryItems(unreachable)
 
   const hasStairs = store.nodes.some((n) => n.kind === 'stairs')
   const hasElevator = store.nodes.some((n) => n.kind === 'elevator')
@@ -266,6 +273,45 @@ export function RouteScreen() {
           {list.items.length === 0
             ? '買うものがありません。リストに追加してください。'
             : 'ルートを作れませんでした。マップに売り場（棚の取り扱いジャンル）が設定されているか確認してください。'}
+        </div>
+      )}
+
+      {(unresolvedItems.length > 0 || missingItems.length > 0 || unreachableItems.length > 0) && (
+        <div className="card">
+          <h2>ルートに含まれていない品目</h2>
+          <ul className="list-rows">
+            {unresolvedItems.map((item) => (
+              <li key={item.id} className="unrouted">
+                <span className="dot" style={{ background: 'var(--outline)' }} />
+                <span className="grow">
+                  <span className="title">{item.text}</span>
+                  <span className="muted">理由: ジャンル未設定</span>
+                </span>
+              </li>
+            ))}
+            {missingItems.map((item) => (
+              <li key={item.id} className="unrouted">
+                <span className="dot" style={{ background: byId.get(item.categoryId!)?.color ?? 'var(--outline)' }} />
+                <span className="grow">
+                  <span className="title">{item.text}</span>
+                  <span className="muted">
+                    {catName(item.categoryId!)} ・ 理由: この店舗に売り場がありません
+                  </span>
+                </span>
+              </li>
+            ))}
+            {unreachableItems.map((item) => (
+              <li key={item.id} className="unrouted">
+                <span className="dot" style={{ background: byId.get(item.categoryId!)?.color ?? 'var(--outline)' }} />
+                <span className="grow">
+                  <span className="title">{item.text}</span>
+                  <span className="muted">
+                    {catName(item.categoryId!)} ・ 理由: 入口からたどり着けません
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

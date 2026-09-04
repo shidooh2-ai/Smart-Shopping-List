@@ -848,6 +848,16 @@ label.field > span {
   border-radius: var(--radius);
 }
 
+.list-rows li.unrouted {
+  background: transparent;
+  border: 1px dashed var(--outline);
+  opacity: 0.7;
+}
+
+.list-rows li.unrouted .title {
+  color: var(--text-dim);
+}
+
 .list-rows .grow {
   flex: 1;
   min-width: 0;
