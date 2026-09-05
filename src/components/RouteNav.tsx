@@ -153,11 +153,16 @@ export function RouteNav({
             {items.length > 0 && (
               <ul className="goods nav-goods" style={{ marginBottom: 10 }}>
                 {items.map((item) => (
-                  <li key={item.id} className={item.checked ? 'done' : ''}>
+                  <li
+                    key={item.id}
+                    className={item.checked ? 'done' : ''}
+                    onClick={() => onToggleItem(item.id, !item.checked)}
+                  >
                     <input
                       type="checkbox"
                       checked={item.checked}
                       onChange={(e) => onToggleItem(item.id, e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
                       aria-label={`${item.text} をカゴに入れた`}
                     />
                     {item.text}
