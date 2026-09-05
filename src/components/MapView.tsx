@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { idx } from '../lib/grid'
 import type { CellArea } from '../lib/navSteps'
 import { CELL, NODE_STYLE, readableText, shelfColor } from '../lib/mapStyle'
@@ -105,7 +105,11 @@ export function MapView({
 
   // 全画面表示では、SVGの表示領域を画面と同じ縦横比にして上下の余白 (レターボックス) を無くす。
   // こうしないと、縦長の画面では地図が中央に小さく収まってしまい、文字が読みにくいままになる。
-  useEffect(() => {
+  // 下のパネル (.navpanel) は手順ごとに高さが変わる (品目数・案内文・レジのボタンの有無) ため、
+  // 地図の表示領域もそのたびに変わる。useEffect (描画後) で測ると、古いカメラ位置のまま
+  // 新しい表示領域が一瞬描かれてしまい (地図が広く/全体表示のように見える瞬間ができる)、
+  // useLayoutEffect (描画前) で測ってカメラ位置の再計算と同じコミットに含めることでそれを防ぐ。
+  useLayoutEffect(() => {
     const el = wrapRef.current
     if (!fullBleed || !el) return
     const measure = () => {
@@ -329,7 +333,7 @@ export function MapView({
   // 誤った位置で描画してしまい、何も描かれていない場所 (背景の白) が一瞬映ってしまう。
   // 階が変わったときだけはアニメーションさせず、瞬時に正しい位置へ合わせる。
   const lastFloorId = useRef(floor.id)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const floorChanged = lastFloorId.current !== floor.id
     lastFloorId.current = floor.id
     if (floorChanged) stopAnimation()
