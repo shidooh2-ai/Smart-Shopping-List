@@ -4,8 +4,9 @@ import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { exportJsonFile } from '../lib/exportFile'
 import { buildIndex, detectCategory } from '../lib/genre'
+import { type CompactFloor, decodeFloorCells, encodeFloorCells } from '../lib/mapCodec'
 import { useAppStore } from '../store/useAppStore'
-import type { Category } from '../types'
+import type { Category, MapNode, Shelf, StoreMap } from '../types'
 
 const SETTINGS_VIEWS = [
   { id: 'settings' as const, label: '設定' },
@@ -40,22 +41,24 @@ export function GenreScreen() {
   const aliasEntries = Object.entries(aliases)
 
   const exportData = () => {
-    const payload = JSON.stringify(
-      {
-        app: 'smart-shopping-list',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        stores,
-        lists,
-        categories,
-        aliases,
-        purchased,
-        nickname,
-        tripHistory,
-      },
-      null,
-      2,
-    )
+    // マスの並びは棚・通路の繰り返しばかりで書き出しJSONの大半を占めるため、
+    // 店舗ごとにランレングス圧縮した形 (mapCodec.ts) に変換してから書き出す。
+    const compactStores = stores.map((s) => ({
+      ...s,
+      floors: s.floors.map((f) => encodeFloorCells(f, s.shelves, s.nodes)),
+    }))
+    const payload = JSON.stringify({
+      app: 'smart-shopping-list',
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      stores: compactStores,
+      lists,
+      categories,
+      aliases,
+      purchased,
+      nickname,
+      tripHistory,
+    })
     void exportJsonFile(`shopping-route-${new Date().toISOString().slice(0, 10)}.json`, payload)
   }
 
@@ -63,8 +66,20 @@ export function GenreScreen() {
     try {
       const data = JSON.parse(await file.text())
       if (!data || typeof data !== 'object') throw new Error('形式が違います')
+      const rawStores = Array.isArray(data.stores) ? (data.stores as Array<Partial<StoreMap>>) : undefined
+      const importedStores = rawStores?.map((s): StoreMap => {
+        const shelves = (s.shelves ?? []) as Shelf[]
+        const nodes = (s.nodes ?? []) as MapNode[]
+        const floors = (s.floors ?? []) as unknown as CompactFloor[]
+        return {
+          ...s,
+          shelves,
+          nodes,
+          floors: floors.map((f) => decodeFloorCells(f, shelves, nodes)),
+        } as StoreMap
+      })
       replaceAll({
-        stores: Array.isArray(data.stores) ? data.stores : undefined,
+        stores: importedStores,
         lists: Array.isArray(data.lists) ? data.lists : undefined,
         categories: Array.isArray(data.categories) ? data.categories : undefined,
         aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : undefined,

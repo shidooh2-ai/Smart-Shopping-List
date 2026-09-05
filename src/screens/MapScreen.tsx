@@ -12,6 +12,7 @@ import { exportJsonFile } from '../lib/exportFile'
 import { combinedCategories } from '../lib/genre'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
+import { encodeFloorCells } from '../lib/mapCodec'
 import { NODE_STYLE } from '../lib/mapStyle'
 import { type PaintTool, useAppStore } from '../store/useAppStore'
 import type { NodeKind, StoreMap } from '../types'
@@ -215,17 +216,16 @@ export function MapScreen() {
   const exportMap = (withCategories: boolean) => {
     const safeName = store.name.replace(/[\\/:*?"<>|]/g, '_')
     const { cloud: _cloud, categories: storeCategories, ...rest } = store
-    const payload = JSON.stringify(
-      {
-        app: 'smart-shopping-list',
-        kind: 'store-map',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        store: withCategories ? { ...rest, categories: storeCategories } : rest,
-      },
-      null,
-      2,
-    )
+    // マスの並びは棚・通路の繰り返しばかりで書き出しJSONの大半を占めるため、
+    // ランレングス圧縮した形 (mapCodec.ts) に変換してから書き出す。
+    const compact = { ...rest, floors: rest.floors.map((f) => encodeFloorCells(f, rest.shelves, rest.nodes)) }
+    const payload = JSON.stringify({
+      app: 'smart-shopping-list',
+      kind: 'store-map',
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      store: withCategories ? { ...compact, categories: storeCategories } : compact,
+    })
     void exportJsonFile(`${safeName}${withCategories ? '-map-genres' : '-map'}.json`, payload)
   }
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { encodeFloorCells } from '../lib/mapCodec'
 import { useAppStore } from './useAppStore'
 
 /**
@@ -92,7 +93,7 @@ describe('useAppStore: マップの書き出し用インポート (importStoreMa
     const source = useAppStore.getState().stores[0]
     const id = useAppStore.getState().importStoreMap({
       name: 'コピーした店舗',
-      floors: source.floors,
+      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
       shelves: source.shelves,
       nodes: source.nodes,
       cellMeters: 1.5,
@@ -110,7 +111,13 @@ describe('useAppStore: マップの書き出し用インポート (importStoreMa
     const id = useAppStore.getState().importStoreMap({
       app: 'smart-shopping-list',
       kind: 'store-map',
-      store: { name: '封筒経由', floors: source.floors, shelves: source.shelves, nodes: source.nodes, cellMeters: 1 },
+      store: {
+        name: '封筒経由',
+        floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
+        shelves: source.shelves,
+        nodes: source.nodes,
+        cellMeters: 1,
+      },
     })
     const imported = useAppStore.getState().stores.find((s) => s.id === id)!
     expect(imported.name).toBe('封筒経由')
@@ -121,7 +128,7 @@ describe('useAppStore: マップの書き出し用インポート (importStoreMa
     const dedicated = [{ id: 'dedicated-1', name: '地域限定コーナー', color: '#123456', keywords: [] }]
     const id = useAppStore.getState().importStoreMap({
       name: 'ジャンル付き',
-      floors: source.floors,
+      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
       shelves: source.shelves,
       nodes: source.nodes,
       cellMeters: 1,
@@ -135,7 +142,7 @@ describe('useAppStore: マップの書き出し用インポート (importStoreMa
     const source = useAppStore.getState().stores[0]
     const id = useAppStore.getState().importStoreMap({
       name: 'ジャンルなし',
-      floors: source.floors,
+      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
       shelves: source.shelves,
       nodes: source.nodes,
       cellMeters: 1,

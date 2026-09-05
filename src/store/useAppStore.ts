@@ -12,6 +12,7 @@ import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
 import { appendActivity, newActivitySince, summarizeItemTexts } from '../lib/listActivity'
 import { notifyListActivity } from '../lib/listActivityNotify'
+import { type CompactFloor, decodeFloorCells } from '../lib/mapCodec'
 import { splitItems } from '../lib/normalize'
 import type {
   Category,
@@ -705,13 +706,16 @@ export const useAppStore = create<AppState>()(
         const envelope = data as { store?: unknown }
         const raw = (envelope.store && typeof envelope.store === 'object' ? envelope.store : data) as Partial<StoreMap>
         if (!Array.isArray(raw.floors) || !Array.isArray(raw.shelves) || !Array.isArray(raw.nodes)) return null
+        const shelves = raw.shelves as Shelf[]
+        const nodes = raw.nodes as MapNode[]
+        const floors = raw.floors as unknown as CompactFloor[]
         const now = Date.now()
         const store: StoreMap = {
           id: newId('store'),
           name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : '読み込んだ店舗',
-          floors: raw.floors as Floor[],
-          shelves: raw.shelves as Shelf[],
-          nodes: raw.nodes as MapNode[],
+          floors: floors.map((f) => decodeFloorCells(f, shelves, nodes)),
+          shelves,
+          nodes,
           cellMeters: typeof raw.cellMeters === 'number' ? raw.cellMeters : 1.2,
           createdAt: now,
           updatedAt: now,
