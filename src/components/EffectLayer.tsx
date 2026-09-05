@@ -86,15 +86,18 @@ interface Falling {
   duration: number
   drift: number
   swayDuration: number
-  /** その場でくるくる回り続ける速さ・向き (紙吹雪・花びらが宙で回転しながら落ちる動き) */
+  /** その場でくるくる回り続ける速さ・向き・軸 (紙吹雪・花びらが宙で回転しながら落ちる動き)。
+   * 画面と平行に回るのではなく、コインを弾いたときのように奥行き方向に回転させる
+   * (rotateX/rotateY + perspective で、裏返るときに幅が狭く見える) */
   spinDuration: number
   spinReverse: boolean
+  spinAxis: 'x' | 'y'
 }
 
 /**
  * 上から落ちてくる紙吹雪・花びら。落下 (fall) と横ゆれ (sway) を入れ子にして
- * 直線的に落ちない軌跡にしたうえで、さらに内側でその場を回転させ続ける (spin)。
- * 花びらは紙吹雪よりゆっくり・大きめに、それ以外の動きは共通。
+ * 直線的に落ちない軌跡にしたうえで、さらに内側で奥行き方向にくるくる回転させ続ける
+ * (spin)。花びらは紙吹雪よりゆっくり・大きめに、それ以外の動きは共通。
  */
 function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; count: number; burst: Burst }) {
   const colors = effectStyle(burst.effectId).colors
@@ -110,6 +113,7 @@ function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; coun
       swayDuration: rand(700, 1400),
       spinDuration: rand(500, 1100),
       spinReverse: Math.random() < 0.5,
+      spinAxis: Math.random() < 0.5 ? 'x' : 'y',
     })),
   )
 
@@ -139,7 +143,7 @@ function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; coun
             }
           >
             <span
-              className="effect-spin"
+              className={`effect-spin axis-${p.spinAxis}`}
               style={
                 {
                   animationDuration: `${p.spinDuration}ms`,
