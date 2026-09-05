@@ -30,6 +30,12 @@ describe('EFFECTS', () => {
       expect(e.description.length).toBeGreaterThan(0)
     }
   })
+
+  it('品目チェック時の演出は、今のところ全種類で無効 (checkCount: 0)', () => {
+    for (const e of EFFECTS) {
+      expect(e.checkCount).toBe(0)
+    }
+  })
 })
 
 describe('isEffectId', () => {

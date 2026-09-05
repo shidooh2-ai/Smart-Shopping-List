@@ -24,6 +24,7 @@ export default function App() {
   const settingsView = useAppStore((s) => s.settingsView)
   const screenWakeLockEnabled = useAppStore((s) => s.screenWakeLockEnabled)
   const theme = useAppStore((s) => s.theme)
+  const effectTheme = useAppStore((s) => s.effectTheme)
 
   useEffect(() => {
     startCloudSyncBridge()
@@ -41,6 +42,14 @@ export default function App() {
     const meta = document.querySelector('meta[name="theme-color"]')
     if (bg && meta) meta.setAttribute('content', bg)
   }, [theme])
+
+  // 選んでいるエフェクトによって、リストのチェックマークの見た目も変える
+  // (リス太→どんぐり、花びら→桜の花びら。他は既定のチェックマークのまま)。
+  useEffect(() => {
+    const root = document.documentElement
+    if (effectTheme === 'default') root.removeAttribute('data-effect')
+    else root.setAttribute('data-effect', effectTheme)
+  }, [effectTheme])
 
   useScreenWakeLock(screenWakeLockEnabled)
 

@@ -30,6 +30,8 @@
         var saved = JSON.parse(localStorage.getItem('smart-shopping-list') || '{}')
         var theme = saved && saved.state && saved.state.theme
         if (theme && theme !== 'default') document.documentElement.setAttribute('data-theme', theme)
+        var effectTheme = saved && saved.state && saved.state.effectTheme
+        if (effectTheme && effectTheme !== 'default') document.documentElement.setAttribute('data-effect', effectTheme)
       } catch (e) {}
     </script>
   </head>

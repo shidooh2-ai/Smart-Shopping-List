@@ -5,6 +5,11 @@
  * 花火は打ち上がってから開く)。絵柄は components/effectArt.tsx のSVG、
  * 動きは components/EffectLayer.tsx と styles.css のキーフレームが担当し、
  * このファイルは粒の数・色・長さといったパラメータだけを持つ。
+ *
+ * 品目を1つチェックしたときの演出 (checkCount) は今のところ全種類 0 にして無効化している
+ * (チェックのたびに画面が賑やかになりすぎるとの声があったため)。買い終えたときの演出
+ * (completeCount) だけは種類ごとに残るので、無効化する前の数値は checkCount にそのまま
+ * 残してある — 再度有効にしたくなったときのために。
  */
 export type EffectId = 'default' | 'confetti' | 'petals' | 'balloons' | 'fireworks' | 'squirrel' | 'minimal'
 
@@ -13,7 +18,7 @@ export interface EffectStyle {
   label: string
   /** 設定画面での一言説明 */
   description: string
-  /** 品目を1つチェックしたときの粒の数 (0なら何も出さない) */
+  /** 品目を1つチェックしたときの粒の数。今のところ全種類0 (無効) */
   checkCount: number
   /** リストを全部買い終えたときの粒の数 (花火は「発」の数) */
   completeCount: number
@@ -31,7 +36,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'default',
     label: 'ひかえめ',
     description: '光の粒がふわっと浮かびます',
-    checkCount: 3,
+    checkCount: 0,
     completeCount: 14,
     checkDurationMs: 1200,
     completeDurationMs: 2200,
@@ -42,7 +47,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'confetti',
     label: '紙吹雪',
     description: '上から紙吹雪がひらひら落ちてきます',
-    checkCount: 6,
+    checkCount: 0,
     completeCount: 44,
     checkDurationMs: 1800,
     completeDurationMs: 3200,
@@ -53,7 +58,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'petals',
     label: '花びら',
     description: '桜の花びらが舞い散ります',
-    checkCount: 5,
+    checkCount: 0,
     completeCount: 30,
     checkDurationMs: 2400,
     completeDurationMs: 3600,
@@ -64,7 +69,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'balloons',
     label: '風船',
     description: '下から風船がふわふわ上がっていきます',
-    checkCount: 2,
+    checkCount: 0,
     completeCount: 14,
     checkDurationMs: 2600,
     completeDurationMs: 3600,
@@ -75,7 +80,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'fireworks',
     label: '花火',
     description: '花火が数発打ち上がります',
-    checkCount: 1,
+    checkCount: 0,
     completeCount: 6,
     checkDurationMs: 1800,
     completeDurationMs: 3600,
@@ -86,7 +91,7 @@ export const EFFECTS: EffectStyle[] = [
     id: 'squirrel',
     label: 'リス太',
     description: 'アプリのキャラクター「リス太」が、どんぐりを集めてお祝いします',
-    checkCount: 2,
+    checkCount: 0,
     completeCount: 12,
     checkDurationMs: 900,
     completeDurationMs: 3000,
