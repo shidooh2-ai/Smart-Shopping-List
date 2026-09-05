@@ -8,6 +8,7 @@ import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { fileToBackgroundImage } from '../lib/aiFloorPlan'
+import { exportJsonFile } from '../lib/exportFile'
 import { combinedCategories } from '../lib/genre'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
@@ -225,12 +226,7 @@ export function MapScreen() {
       null,
       2,
     )
-    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${safeName}${withCategories ? '-map-genres' : '-map'}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    void exportJsonFile(`${safeName}${withCategories ? '-map-genres' : '-map'}.json`, payload)
   }
 
   return (

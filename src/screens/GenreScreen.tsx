@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
+import { exportJsonFile } from '../lib/exportFile'
 import { buildIndex, detectCategory } from '../lib/genre'
 import { useAppStore } from '../store/useAppStore'
 import type { Category } from '../types'
@@ -55,12 +56,7 @@ export function GenreScreen() {
       null,
       2,
     )
-    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `shopping-route-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    void exportJsonFile(`shopping-route-${new Date().toISOString().slice(0, 10)}.json`, payload)
   }
 
   const importData = async (file: File) => {
