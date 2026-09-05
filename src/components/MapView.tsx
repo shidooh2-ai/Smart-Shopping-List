@@ -324,10 +324,20 @@ export function MapView({
   // 寄せる範囲が変わるたび、その範囲がちょうど収まる位置・倍率へ動かす。
   // 依存配列に入れるため、範囲は数値をつないだ文字列で比較する。
   const focusKey = focusArea ? `${focusArea.x0},${focusArea.y0},${focusArea.x1},${focusArea.y1}` : null
+  // 表示中の階をまたいだ移動 (階段・エレベーターの中継など) では、直前の階の座標のまま
+  // なめらかに動かそうとすると、切り替わった直後の1〜2フレームだけ別の階のマスを
+  // 誤った位置で描画してしまい、何も描かれていない場所 (背景の白) が一瞬映ってしまう。
+  // 階が変わったときだけはアニメーションさせず、瞬時に正しい位置へ合わせる。
+  const lastFloorId = useRef(floor.id)
   useEffect(() => {
+    const floorChanged = lastFloorId.current !== floor.id
+    lastFloorId.current = floor.id
+    if (floorChanged) stopAnimation()
+    const moveTo = floorChanged ? setView : animateTo
+
     if (!focusArea) {
       // 全画面で寄せ先が無いときは地図全体を表示する
-      if (fullBleed && boxRatio) animateTo(fitAll())
+      if (fullBleed && boxRatio) moveTo(fitAll())
       return
     }
     const pad = CELL * 0.9
@@ -336,7 +346,7 @@ export function MapView({
     const w = (focusArea.x1 - focusArea.x0 + 1) * CELL + pad * 2
     const h = (focusArea.y1 - focusArea.y0 + 1) * CELL + pad * 2
     const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(viewW / w, viewH / h)))
-    animateTo(
+    moveTo(
       clamp({
         scale,
         tx: viewW / 2 - (x + w / 2) * scale,
@@ -346,7 +356,7 @@ export function MapView({
     return stopAnimation
     // focusKey は focusArea の中身そのもの。clamp/animateTo は毎回同じ動作をする
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey, viewW, viewH, fullBleed, boxRatio])
+  }, [focusKey, viewW, viewH, fullBleed, boxRatio, floor.id])
 
   // --- 描画データ ---
   /** 棚名を、その棚の形に収まるサイズ・向きで置く */
