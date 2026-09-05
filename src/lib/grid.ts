@@ -79,6 +79,15 @@ export function nodePos(map: StoreMap, node: MapNode): Pos | null {
   return null
 }
 
+/** nodePos の逆引き。指定の位置にある設備 (階段・エレベーターなど) を返す。 */
+export function nodeAt(map: StoreMap, pos: Pos): MapNode | null {
+  const floor = getFloor(map, pos.floorId)
+  if (!floor) return null
+  const c = cellAt(floor, pos.x, pos.y)
+  if (!c || c.k !== 'node') return null
+  return map.nodes.find((n) => n.id === c.nodeId) ?? null
+}
+
 /** マップ上に配置されていない棚/ノードを取り除いた整合状態を返す。 */
 export function pruneOrphans(map: StoreMap): StoreMap {
   const usedShelves = new Set<string>()

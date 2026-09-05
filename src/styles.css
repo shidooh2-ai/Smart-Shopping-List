@@ -98,8 +98,49 @@
   justify-content: center;
 }
 
+/* 階段・エレベーターへの中継手順 (立ち寄り先ではない) は色を変えて区別する */
+.navpanel .badge.relay {
+  background: var(--accent);
+  font-size: 15px;
+}
+
 .navpanel .where {
   font-weight: 700;
+}
+
+/* 全画面ナビの品目チェックリスト。片手で歩きながらでもタップしやすいよう、
+   画面のリスト表示 (.stop .goods) より一回り大きくしてある。 */
+.navpanel .nav-goods {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.navpanel .nav-goods li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  font-size: 17px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.navpanel .nav-goods li.done {
+  color: var(--text-dim);
+  text-decoration: line-through;
+  background: transparent;
+}
+
+.navpanel .nav-goods input {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  accent-color: var(--accent);
 }
 
 /* ---------- テーマ ----------

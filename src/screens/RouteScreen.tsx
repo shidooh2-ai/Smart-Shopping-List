@@ -383,7 +383,9 @@ export function RouteScreen() {
           plan={plan}
           itemById={itemById}
           doneStopOrders={doneStopOrders}
+          checkedItemCount={checkedItemIds.length}
           onToggleItem={(itemId, checked) => setItemChecked(list.id, itemId, checked)}
+          onCheckout={checkoutToPurchased}
           onClose={() => setNavOpen(false)}
         />
       )}

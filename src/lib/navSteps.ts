@@ -1,4 +1,5 @@
-import type { Pos, RoutePlan } from '../types'
+import { getFloor, nodeAt } from './grid'
+import type { Pos, RoutePlan, StoreMap } from '../types'
 
 /** 地図を寄せる範囲 (マス単位。x1/y1 も含む) */
 export interface CellArea {
@@ -9,12 +10,16 @@ export interface CellArea {
 }
 
 export interface NavStep {
-  /** この区間の終点にある立ち寄り番号。レジへ向かう最後の区間は null */
+  /** 'stop' = 立ち寄り先、'relay' = 階段・エレベーターへの中継、'checkout' = レジへ */
+  kind: 'stop' | 'relay' | 'checkout'
+  /** kind==='stop' のときの立ち寄り番号。それ以外は null */
   stopOrder: number | null
-  /** 終点のあるフロア (区間の途中で階をまたぐ場合は、着いた先の階) */
+  /** この区間の終点にある階 */
   floorId: string
   /** その階を通る経路がちょうど収まる範囲 */
   area: CellArea
+  /** kind==='relay' のときの案内文 (例: "階段へ") */
+  label?: string
 }
 
 function areaOf(points: Pos[]): CellArea {
@@ -30,28 +35,54 @@ function areaOf(points: Pos[]): CellArea {
   )
 }
 
+/** 経路を、フロアが変わるたびに区切った連続区間の並びにする。 */
+function splitByFloor(path: Pos[]): Pos[][] {
+  const runs: Pos[][] = []
+  for (const p of path) {
+    const last = runs[runs.length - 1]
+    if (last && last[last.length - 1].floorId === p.floorId) last.push(p)
+    else runs.push([p])
+  }
+  return runs
+}
+
 /**
  * ルートを「区間ごとのナビ手順」に分解する。
  *
  * plan.legs[i] は stops[i] へ向かう区間で、最後の区間はレジへ向かう (立ち寄り先は無い)。
- * 階をまたぐ区間では着いた先の階を表示したいので、終点の階と、その階を通る部分だけを
- * 寄せる範囲にする。
+ * 階をまたぐ区間は、フロアが変わるたびに区切って手順を分ける
+ * (例: 1F入口→階段→2Fの棚、なら「階段へ」「棚へ」の2手順になる)。
+ * 中継 (階段・エレベーターへ) の手順には案内文 (label) が付く。
  */
-export function buildNavSteps(plan: RoutePlan | null): NavStep[] {
-  if (!plan) return []
+export function buildNavSteps(plan: RoutePlan | null, map: StoreMap | null = null): NavStep[] {
+  if (!plan || !map) return []
   const steps: NavStep[] = []
 
   plan.legs.forEach((leg, i) => {
     if (leg.path.length === 0) return
     const stop = i < plan.stops.length ? plan.stops[i] : null
-    const destination = leg.path[leg.path.length - 1]
-    const floorId = stop?.pos.floorId ?? destination.floorId
-    // 着いた先の階を通る部分だけを写す (別の階を歩いた分まで含めると、寄りが甘くなる)
-    const onFloor = leg.path.filter((p) => p.floorId === floorId)
-    steps.push({
-      stopOrder: stop?.order ?? null,
-      floorId,
-      area: areaOf(onFloor.length > 0 ? onFloor : [destination]),
+    const runs = splitByFloor(leg.path)
+
+    runs.forEach((run, ri) => {
+      const floorId = run[run.length - 1].floorId
+      if (ri < runs.length - 1) {
+        // このフロア内で最後にいる場所 (=階段・エレベーターの手前) から、乗り物の名前を引く
+        const node = nodeAt(map, run[run.length - 1])
+        steps.push({
+          kind: 'relay',
+          stopOrder: null,
+          floorId,
+          area: areaOf(run),
+          label: node ? `${node.name}へ` : (getFloor(map, floorId)?.name ?? '') + 'の乗り場へ',
+        })
+        return
+      }
+      steps.push({
+        kind: stop ? 'stop' : 'checkout',
+        stopOrder: stop?.order ?? null,
+        floorId,
+        area: areaOf(run),
+      })
     })
   })
 
@@ -64,10 +95,32 @@ export function stepIndexOfStop(steps: NavStep[], stopOrder: number): number {
 }
 
 /**
- * まだ買い終わっていない最初の手順を返す。
- * 全部終わっていれば最後の手順 (レジへ向かう区間) を返す。
+ * まだ買い終わっていない最初の手順を返す。直前が中継 (階段・エレベーターへ) なら
+ * そこから案内を始める。全部終わっていれば最後の手順 (レジへ向かう区間) を返す。
  */
 export function firstUnfinishedStep(steps: NavStep[], doneStopOrders: Set<number>): number {
-  const index = steps.findIndex((s) => s.stopOrder !== null && !doneStopOrders.has(s.stopOrder))
-  return index === -1 ? Math.max(0, steps.length - 1) : index
+  const index = steps.findIndex((s) => s.kind === 'stop' && s.stopOrder !== null && !doneStopOrders.has(s.stopOrder))
+  if (index === -1) return Math.max(0, steps.length - 1)
+  if (index > 0 && steps[index - 1].kind === 'relay') return index - 1
+  return index
+}
+
+/**
+ * いま見ている手順の品目を買い終わっていたら、次の手順へ進める。
+ * 通り道の中継地点 (階段・エレベーターへ) やレジは飛ばさずそこで止め、
+ * 買い終わった立ち寄り先だけをまとめて読み飛ばす。
+ */
+export function advanceIfDone(steps: NavStep[], current: number, doneStopOrders: Set<number>): number {
+  const step = steps[current]
+  if (!step || step.kind !== 'stop' || step.stopOrder === null || !doneStopOrders.has(step.stopOrder)) return current
+  let i = current + 1
+  while (i < steps.length - 1) {
+    const s = steps[i]
+    if (s.kind === 'stop' && s.stopOrder !== null && doneStopOrders.has(s.stopOrder)) {
+      i++
+      continue
+    }
+    break
+  }
+  return i
 }

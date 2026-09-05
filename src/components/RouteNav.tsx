@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { buildNavSteps, firstUnfinishedStep } from '../lib/navSteps'
+import { advanceIfDone, buildNavSteps, firstUnfinishedStep } from '../lib/navSteps'
 import type { Category, RoutePlan, ShoppingItem, StoreMap } from '../types'
 import { MapView } from './MapView'
 
@@ -13,14 +13,19 @@ export interface RouteNavProps {
   itemById: Map<string, ShoppingItem>
   /** 品目が全部チェック済みの立ち寄り番号 */
   doneStopOrders: Set<number>
+  /** レジの手順で「購入済みにする」を出すためのチェック済み品目数 */
+  checkedItemCount: number
   onToggleItem: (itemId: string, checked: boolean) => void
+  /** レジの手順の「チェック済みN件を購入済みにする」を押したとき */
+  onCheckout: () => void
   onClose: () => void
 }
 
 /**
  * ルートの全画面表示。地図を画面いっぱいに出し、「ナビ開始」すると
  * 区間 (地点から地点まで) を拡大して表示する。その地点の品目を全部チェックすると
- * 次の区間へ自動で進み、地図はなめらかに移動する。
+ * 次の区間へ自動で進み、地図はなめらかに移動する。階をまたぐ区間では、階段・エレベーター
+ * へ向かう中継の手順を挟む。
  */
 export function RouteNav({
   open,
@@ -29,10 +34,12 @@ export function RouteNav({
   plan,
   itemById,
   doneStopOrders,
+  checkedItemCount,
   onToggleItem,
+  onCheckout,
   onClose,
 }: RouteNavProps) {
-  const steps = useMemo(() => buildNavSteps(plan), [plan])
+  const steps = useMemo(() => buildNavSteps(plan, store), [plan, store])
   /** null = ナビ開始前 (全体表示) */
   const [stepIndex, setStepIndex] = useState<number | null>(null)
 
@@ -41,16 +48,19 @@ export function RouteNav({
     if (open) setStepIndex(null)
   }, [open])
 
-  // 買い終わった地点は飛ばして次の区間へ進む
+  // 「前」で買い終わった立ち寄りへ戻れるよう、この効果は手動でのページ送り (stepIndex の変化) では
+  // 発火させず、品目のチェック状態が変わったとき (doneStopOrders の変化) だけ次へ進める。
+  const stepIndexRef = useRef(stepIndex)
   useEffect(() => {
-    if (stepIndex === null) return
-    const current = steps[stepIndex]
-    if (!current || current.stopOrder === null) return
-    if (doneStopOrders.has(current.stopOrder)) {
-      const next = firstUnfinishedStep(steps, doneStopOrders)
-      if (next !== stepIndex) setStepIndex(next)
-    }
-  }, [doneStopOrders, stepIndex, steps])
+    stepIndexRef.current = stepIndex
+  }, [stepIndex])
+
+  useEffect(() => {
+    const idx = stepIndexRef.current
+    if (idx === null) return
+    const next = advanceIfDone(steps, idx, doneStopOrders)
+    if (next !== idx) setStepIndex(next)
+  }, [doneStopOrders, steps])
 
   useEffect(() => {
     if (!open) return
@@ -73,6 +83,8 @@ export function RouteNav({
     if (stepIndex === null) return
     setStepIndex(Math.min(steps.length - 1, Math.max(0, stepIndex + delta)))
   }
+
+  const heading = stop ? stop.shelfNames.join(' / ') : step?.kind === 'relay' ? step.label : 'レジへ'
 
   // タブバーなどのスタッキングに巻き込まれないよう、body直下に描画する
   return createPortal(
@@ -121,17 +133,25 @@ export function RouteNav({
         ) : (
           <>
             <div className="row" style={{ marginBottom: 8 }}>
-              <span className="badge">{step?.stopOrder ?? '⤷'}</span>
+              <span className={`badge${step?.kind === 'relay' ? ' relay' : ''}`}>
+                {step?.kind === 'stop' ? step.stopOrder : step?.kind === 'relay' ? '⏩' : '⤷'}
+              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="where">{stop ? stop.shelfNames.join(' / ') : 'レジへ'}</div>
+                <div className="where">{heading}</div>
                 <span className="muted">
                   {stepIndex + 1} / {steps.length}
                 </span>
               </div>
             </div>
 
+            {step?.kind === 'relay' && (
+              <p className="muted" style={{ margin: '0 0 10px' }}>
+                この先で階が変わります。{step.label}向かってください。
+              </p>
+            )}
+
             {items.length > 0 && (
-              <ul className="goods" style={{ marginBottom: 10 }}>
+              <ul className="goods nav-goods" style={{ marginBottom: 10 }}>
                 {items.map((item) => (
                   <li key={item.id} className={item.checked ? 'done' : ''}>
                     <input
@@ -144,6 +164,20 @@ export function RouteNav({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {step?.kind === 'checkout' && (
+              <button
+                type="button"
+                className="btn primary"
+                style={{ width: '100%', marginBottom: 10 }}
+                disabled={checkedItemCount === 0}
+                onClick={onCheckout}
+              >
+                {checkedItemCount > 0
+                  ? `チェック済み${checkedItemCount}件を購入済みにする`
+                  : 'チェック済みの品目がありません'}
+              </button>
             )}
 
             <div className="row">
