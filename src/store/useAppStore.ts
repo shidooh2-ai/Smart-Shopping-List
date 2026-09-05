@@ -7,7 +7,7 @@ import { createSampleStore } from '../data/sampleStore'
 import { type EffectId, isEffectId } from '../data/effects'
 import type { ThemeId } from '../data/themes'
 import { fireEffect } from '../lib/effectBus'
-import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
+import { aliasKey, buildIndex, combinedCategories, detectCategory } from '../lib/genre'
 import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
 import { appendActivity, newActivitySince, summarizeItemTexts } from '../lib/listActivity'
@@ -128,6 +128,15 @@ export interface AppState {
   deleteStore: (storeId: string) => void
   renameStore: (storeId: string, name: string) => void
   setCellMeters: (storeId: string, meters: number) => void
+  /** その店舗だけの専用ジャンルを追加する (グローバルなジャンル一覧とは別に持つ) */
+  addStoreCategory: (storeId: string, name: string, color: string) => string
+  updateStoreCategory: (storeId: string, categoryId: string, patch: Partial<Omit<Category, 'id'>>) => void
+  deleteStoreCategory: (storeId: string, categoryId: string) => void
+  /**
+   * 配布された店舗マップのJSON (書き出し機能で作ったもの) を新しい店舗として取り込む。
+   * 形式が合わなければ null を返す。
+   */
+  importStoreMap: (data: unknown) => string | null
   addFloor: (storeId: string) => string
   updateFloor: (
     storeId: string,
@@ -386,11 +395,14 @@ export const useAppStore = create<AppState>()(
 
       addItems: (listId, text) =>
         set((s) => {
-          const index = buildIndex(s.categories)
+          const list = s.lists.find((l) => l.id === listId)
+          const store = list?.storeId ? s.stores.find((st) => st.id === list.storeId) : null
+          const allCategories = combinedCategories(s.categories, store)
+          const index = buildIndex(allCategories)
           const now = Date.now()
           const addedBy = s.nickname.trim() || null
           const created: ShoppingItem[] = splitItems(text).map((raw, i) => {
-            const match = detectCategory(raw, s.categories, s.aliases, index)
+            const match = detectCategory(raw, allCategories, s.aliases, index)
             return {
               id: newId('item'),
               text: raw,
@@ -446,14 +458,17 @@ export const useAppStore = create<AppState>()(
 
       renameItem: (listId, itemId, text) =>
         set((s) => {
-          const index = buildIndex(s.categories)
+          const list = s.lists.find((l) => l.id === listId)
+          const store = list?.storeId ? s.stores.find((st) => st.id === list.storeId) : null
+          const allCategories = combinedCategories(s.categories, store)
+          const index = buildIndex(allCategories)
           return {
             lists: mapList(s.lists, listId, (l) => ({
               ...l,
               items: l.items.map((i) => {
                 if (i.id !== itemId) return i
                 if (i.manual) return { ...i, text }
-                const match = detectCategory(text, s.categories, s.aliases, index)
+                const match = detectCategory(text, allCategories, s.aliases, index)
                 return {
                   ...i,
                   text,
@@ -515,13 +530,16 @@ export const useAppStore = create<AppState>()(
 
       redetectCategories: (listId) =>
         set((s) => {
-          const index = buildIndex(s.categories)
+          const list = s.lists.find((l) => l.id === listId)
+          const store = list?.storeId ? s.stores.find((st) => st.id === list.storeId) : null
+          const allCategories = combinedCategories(s.categories, store)
+          const index = buildIndex(allCategories)
           return {
             lists: mapList(s.lists, listId, (l) => ({
               ...l,
               items: l.items.map((i) => {
                 if (i.manual) return i
-                const match = detectCategory(i.text, s.categories, s.aliases, index)
+                const match = detectCategory(i.text, allCategories, s.aliases, index)
                 return { ...i, categoryId: match?.categoryId ?? null, confidence: match?.score ?? 0 }
               }),
             })),
@@ -640,6 +658,65 @@ export const useAppStore = create<AppState>()(
 
       addSampleStore: () => {
         const store = createSampleStore()
+        set((s) => ({ stores: [...s.stores, store] }))
+        return store.id
+      },
+
+      addStoreCategory: (storeId, name, color) => {
+        const id = newId('cat')
+        set((s) => ({
+          stores: mapStore(s.stores, storeId, (st) => ({
+            ...st,
+            categories: [...(st.categories ?? []), { id, name, color, keywords: [] }],
+          })),
+        }))
+        return id
+      },
+
+      updateStoreCategory: (storeId, categoryId, patch) =>
+        set((s) => ({
+          stores: mapStore(s.stores, storeId, (st) => ({
+            ...st,
+            categories: (st.categories ?? []).map((c) => (c.id === categoryId ? { ...c, ...patch } : c)),
+          })),
+        })),
+
+      deleteStoreCategory: (storeId, categoryId) =>
+        set((s) => ({
+          stores: mapStore(s.stores, storeId, (st) => ({
+            ...st,
+            categories: (st.categories ?? []).filter((c) => c.id !== categoryId),
+            // 参照が残らないよう、その店舗の棚からも外す
+            shelves: st.shelves.map((sh) => ({
+              ...sh,
+              categoryIds: sh.categoryIds.filter((id) => id !== categoryId),
+            })),
+          })),
+          // 品目側の参照は店舗をまたいで持ち歩けないので、こちらは全リスト対象に外す
+          lists: s.lists.map((l) => ({
+            ...l,
+            items: l.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: null, manual: false } : i)),
+          })),
+        })),
+
+      importStoreMap: (data) => {
+        if (!data || typeof data !== 'object') return null
+        // 書き出し機能が付けた封筒 ({ store: {...} }) でも、StoreMap そのものでも受け付ける
+        const envelope = data as { store?: unknown }
+        const raw = (envelope.store && typeof envelope.store === 'object' ? envelope.store : data) as Partial<StoreMap>
+        if (!Array.isArray(raw.floors) || !Array.isArray(raw.shelves) || !Array.isArray(raw.nodes)) return null
+        const now = Date.now()
+        const store: StoreMap = {
+          id: newId('store'),
+          name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : '読み込んだ店舗',
+          floors: raw.floors as Floor[],
+          shelves: raw.shelves as Shelf[],
+          nodes: raw.nodes as MapNode[],
+          cellMeters: typeof raw.cellMeters === 'number' ? raw.cellMeters : 1.2,
+          createdAt: now,
+          updatedAt: now,
+          categories: Array.isArray(raw.categories) ? (raw.categories as Category[]) : undefined,
+        }
         set((s) => ({ stores: [...s.stores, store] }))
         return store.id
       },

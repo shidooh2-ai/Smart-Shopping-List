@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../data/categories'
-import { MATCH_THRESHOLD, buildIndex, detectCategory } from './genre'
+import type { Category, StoreMap } from '../types'
+import { MATCH_THRESHOLD, buildIndex, combinedCategories, detectCategory } from './genre'
 
 const index = buildIndex(DEFAULT_CATEGORIES)
 const detect = (text: string, aliases: Record<string, string> = {}) =>
@@ -84,5 +85,34 @@ describe('detectCategory', () => {
     const m = detect('キャベツ')
     expect(m?.reason).toBe('exact')
     expect(m?.score).toBe(1)
+  })
+})
+
+describe('combinedCategories', () => {
+  const dedicated: Category = { id: 'dedicated-1', name: '地域限定コーナー', color: '#123456', keywords: ['ご当地'] }
+  const storeWith = (categories?: Category[]): StoreMap =>
+    ({ id: 's1', name: 'テスト店', floors: [], shelves: [], nodes: [], cellMeters: 1, createdAt: 0, updatedAt: 0, categories }) as StoreMap
+
+  it('店舗が無ければグローバルのみ', () => {
+    expect(combinedCategories(DEFAULT_CATEGORIES, null)).toBe(DEFAULT_CATEGORIES)
+    expect(combinedCategories(DEFAULT_CATEGORIES, undefined)).toBe(DEFAULT_CATEGORIES)
+  })
+
+  it('店舗に専用ジャンルが無ければグローバルのみ', () => {
+    expect(combinedCategories(DEFAULT_CATEGORIES, storeWith(undefined))).toBe(DEFAULT_CATEGORIES)
+    expect(combinedCategories(DEFAULT_CATEGORIES, storeWith([]))).toBe(DEFAULT_CATEGORIES)
+  })
+
+  it('店舗の専用ジャンルをグローバルの後ろに加える', () => {
+    const result = combinedCategories(DEFAULT_CATEGORIES, storeWith([dedicated]))
+    expect(result).toHaveLength(DEFAULT_CATEGORIES.length + 1)
+    expect(result[result.length - 1]).toEqual(dedicated)
+  })
+
+  it('専用ジャンルの語彙も自動判定に使われる', () => {
+    const categories = combinedCategories(DEFAULT_CATEGORIES, storeWith([dedicated]))
+    const idx = buildIndex(categories)
+    const m = detectCategory('ご当地', categories, {}, idx)
+    expect(m?.categoryId).toBe('dedicated-1')
   })
 })

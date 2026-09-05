@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapView } from '../components/MapView'
 import { RouteNav } from '../components/RouteNav'
+import { combinedCategories } from '../lib/genre'
 import { planRoute, routeMetrics } from '../lib/route'
 import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
 import type { RoutePreference, ShoppingItem } from '../types'
@@ -16,7 +17,8 @@ export function RouteScreen() {
   const store = useListStore(list)
   const lists = useAppStore((s) => s.lists)
   const stores = useAppStore((s) => s.stores)
-  const categories = useAppStore((s) => s.categories)
+  const globalCategories = useAppStore((s) => s.categories)
+  const categories = useMemo(() => combinedCategories(globalCategories, store), [globalCategories, store])
   const setActiveList = useAppStore((s) => s.setActiveList)
   const setListStore = useAppStore((s) => s.setListStore)
   const setItemChecked = useAppStore((s) => s.setItemChecked)

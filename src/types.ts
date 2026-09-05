@@ -52,6 +52,11 @@ export interface StoreMap {
   updatedAt: number
   /** iCloud (CloudKit) 経由で共有中の場合の情報 */
   cloud?: CloudLink
+  /**
+   * この店舗専用のジャンル。グローバルなジャンル一覧 (useAppStore.categories) とは別に、
+   * このマップの棚だけが参照できる。マップを配布するとき一緒に持ち運べるようにするため。
+   */
+  categories?: Category[]
 }
 
 export interface Category {

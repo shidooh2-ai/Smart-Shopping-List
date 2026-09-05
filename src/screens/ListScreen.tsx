@@ -4,10 +4,11 @@ import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
 import { PALETTE } from '../data/palette'
+import { combinedCategories } from '../lib/genre'
 import { purchaseContributions } from '../lib/listActivity'
 import { WEEKDAY_LABELS, describeReminder, isReminderSupported } from '../lib/reminders'
 import { computeStreak, computeTimeTrend } from '../lib/tripStats'
-import { useActiveList, useAppStore } from '../store/useAppStore'
+import { useActiveList, useAppStore, useListStore } from '../store/useAppStore'
 import type { Category, CloudLink, ListNotificationPrefs, ListReminder, ReminderRepeat, ShoppingItem } from '../types'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -26,7 +27,9 @@ type ListSheetMode = { kind: 'menu' } | { kind: 'edit'; listId: string } | { kin
 
 export function ListScreen() {
   const list = useActiveList()
-  const categories = useAppStore((s) => s.categories)
+  const globalCategories = useAppStore((s) => s.categories)
+  const store = useListStore(list)
+  const categories = useMemo(() => combinedCategories(globalCategories, store), [globalCategories, store])
   const lists = useAppStore((s) => s.lists)
   const tripHistory = useAppStore((s) => s.tripHistory)
   const {

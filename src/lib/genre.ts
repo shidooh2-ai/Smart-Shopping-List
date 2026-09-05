@@ -1,4 +1,4 @@
-import type { Category } from '../types'
+import type { Category, StoreMap } from '../types'
 import { diceCoefficient, normalize } from './normalize'
 
 export type MatchReason = 'alias' | 'exact' | 'contains' | 'similar'
@@ -19,6 +19,15 @@ export interface IndexEntry {
   categoryId: string
   keyword: string
   norm: string
+}
+
+/**
+ * グローバルなジャンル一覧に、指定した店舗の専用ジャンルを加えたもの。
+ * 品目のジャンル自動判定や棚のジャンル設定など、「その店舗の文脈で選べるジャンル」が
+ * 必要な場面ではこれを使う (店舗が無い/専用ジャンルが無ければグローバルのみ)。
+ */
+export function combinedCategories(global: Category[], store?: StoreMap | null): Category[] {
+  return store?.categories && store.categories.length > 0 ? [...global, ...store.categories] : global
 }
 
 /** カテゴリ配列から検索用インデックスを作る (カテゴリ名自身も語彙に含める)。 */

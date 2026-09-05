@@ -6,7 +6,9 @@ import { CloudShareSection } from '../components/CloudShareSection'
 import { MapView } from '../components/MapView'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
+import { PALETTE } from '../data/palette'
 import { fileToBackgroundImage } from '../lib/aiFloorPlan'
+import { combinedCategories } from '../lib/genre'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
 import { NODE_STYLE } from '../lib/mapStyle'
@@ -72,6 +74,10 @@ export function MapScreen() {
     shareStore,
     unshareStore,
     setSettingsView,
+    addStoreCategory,
+    updateStoreCategory,
+    deleteStoreCategory,
+    importStoreMap,
   } = useAppStore()
 
   const [storeId, setStoreId] = useState<string | null>(stores[0]?.id ?? null)
@@ -86,13 +92,17 @@ export function MapScreen() {
   const [addStoreSheet, setAddStoreSheet] = useState(false)
   const [catPicker, setCatPicker] = useState(false)
   const [aiSheet, setAiSheet] = useState(false)
+  const [editingStoreCategory, setEditingStoreCategory] = useState<string | null>(null)
+  const [storeCategoryKeyword, setStoreCategoryKeyword] = useState('')
   /** 背景画像と見比べるための、生成/編集したマップ側の一時的な不透明度 (保存はしない) */
   const [mapOverlayOpacity, setMapOverlayOpacity] = useState(1)
   const shelfRef = useRef<string | null>(null)
   const bgFileRef = useRef<HTMLInputElement | null>(null)
+  const importMapFileRef = useRef<HTMLInputElement | null>(null)
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
+  const mapCategories = useMemo(() => combinedCategories(categories, store), [categories, store])
   const canUndo = useAppStore((s) => (store ? (s.mapHistory[store.id]?.length ?? 0) > 0 : false))
   const canRedo = useAppStore((s) => (store ? (s.mapRedo[store.id]?.length ?? 0) > 0 : false))
 
@@ -187,6 +197,42 @@ export function MapScreen() {
     }
   }
 
+  /** 配布用に書き出されたマップ (店舗設定の「書き出す」で作ったもの) を、新しい店舗として取り込む。 */
+  const importMapFile = async (file: File) => {
+    try {
+      const data = JSON.parse(await file.text())
+      const id = importStoreMap(data)
+      if (!id) throw new Error('マップの形式が違います')
+      switchToStore(id)
+      window.alert('店舗を追加しました。')
+    } catch (e) {
+      window.alert(`読み込めませんでした: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  /** この店舗のマップを配布用のJSONとして書き出す。withCategories なら専用ジャンルも含める。 */
+  const exportMap = (withCategories: boolean) => {
+    const safeName = store.name.replace(/[\\/:*?"<>|]/g, '_')
+    const { cloud: _cloud, categories: storeCategories, ...rest } = store
+    const payload = JSON.stringify(
+      {
+        app: 'smart-shopping-list',
+        kind: 'store-map',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        store: withCategories ? { ...rest, categories: storeCategories } : rest,
+      },
+      null,
+      2,
+    )
+    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName}${withCategories ? '-map-genres' : '-map'}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="screen">
       <ViewSwitch options={SETTINGS_VIEWS} active="map" onChange={setSettingsView} />
@@ -205,7 +251,21 @@ export function MapScreen() {
           <button type="button" className="btn slim" onClick={() => setStoreSheet(true)}>
             店舗設定
           </button>
+          <button type="button" className="btn slim" onClick={() => importMapFileRef.current?.click()}>
+            読み込む
+          </button>
         </div>
+        <input
+          ref={importMapFileRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void importMapFile(f)
+            e.target.value = ''
+          }}
+        />
       </div>
 
       <div className="card">
@@ -258,7 +318,7 @@ export function MapScreen() {
         <MapView
           store={store}
           floor={floor}
-          categories={categories}
+          categories={mapCategories}
           onPaint={tool === 'select' ? undefined : handlePaint}
           paintMode={isNodeTool(tool) ? 'point' : 'area'}
           paintPreviewColor={previewColorFor(tool)}
@@ -416,7 +476,7 @@ export function MapScreen() {
             <i style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} />
             通路
           </span>
-          {categories.slice(0, 6).map((c) => (
+          {mapCategories.slice(0, 6).map((c) => (
             <span key={c.id}>
               <i style={{ background: c.color }} />
               {c.name}
@@ -443,7 +503,7 @@ export function MapScreen() {
                     {s.categoryIds.length === 0
                       ? 'ジャンル未設定 — タップして設定'
                       : s.categoryIds
-                          .map((id) => categories.find((c) => c.id === id)?.name ?? '?')
+                          .map((id) => mapCategories.find((c) => c.id === id)?.name ?? '?')
                           .join('、')}
                   </span>
                 </span>
@@ -472,7 +532,7 @@ export function MapScreen() {
             <div className="row wrap" style={{ margin: '6px 0 12px' }}>
               {activeShelf.categoryIds.length === 0 && <span className="chip unknown">未設定</span>}
               {activeShelf.categoryIds.map((id) => {
-                const c = categories.find((cc) => cc.id === id)
+                const c = mapCategories.find((cc) => cc.id === id)
                 return (
                   <button
                     key={id}
@@ -513,7 +573,7 @@ export function MapScreen() {
         open={catPicker}
         title="取り扱うジャンル"
         multiple
-        categories={categories}
+        categories={mapCategories}
         selected={activeShelf?.categoryIds ?? []}
         onToggle={(cid) => {
           if (!activeShelf || !cid) return
@@ -677,6 +737,66 @@ export function MapScreen() {
           onShare={() => shareStore(store.id)}
           onUnshare={() => unshareStore(store.id)}
         />
+
+        <div style={{ margin: '14px 0' }}>
+          <div className="row" style={{ marginBottom: 6 }}>
+            <span className="muted">この店舗専用のジャンル（{(store.categories ?? []).length}）</span>
+            <span className="spacer" />
+            <button
+              type="button"
+              className="btn slim"
+              onClick={() =>
+                setEditingStoreCategory(
+                  addStoreCategory(
+                    store.id,
+                    '新しい専用ジャンル',
+                    PALETTE[(store.categories?.length ?? 0) % PALETTE.length],
+                  ),
+                )
+              }
+            >
+              ＋ 専用のジャンルを追加する
+            </button>
+          </div>
+          {(store.categories ?? []).length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              この店舗だけで使うジャンル（例:「地域限定コーナー」）です。棚の設定やこの店舗のリストの自動判定で使え、マップと一緒に書き出せます。
+            </p>
+          ) : (
+            <ul className="list-rows">
+              {(store.categories ?? []).map((c) => (
+                <li key={c.id}>
+                  <span style={{ width: 26, height: 26, borderRadius: '50%', background: c.color, flex: 'none' }} />
+                  <span className="grow">
+                    <span className="title">{c.name}</span>
+                    <span className="muted">語彙 {c.keywords.length} 語</span>
+                  </span>
+                  <button type="button" className="btn slim accent" onClick={() => setEditingStoreCategory(c.id)}>
+                    編集
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div style={{ margin: '14px 0' }}>
+          <span className="muted" style={{ display: 'block', marginBottom: 6 }}>
+            配布用に書き出す
+          </span>
+          <div className="row wrap">
+            <button type="button" className="btn slim" onClick={() => exportMap(false)}>
+              マップを書き出す
+            </button>
+            <button type="button" className="btn slim" onClick={() => exportMap(true)}>
+              マップ＋専用ジャンルを書き出す
+            </button>
+          </div>
+          <p className="muted" style={{ margin: '6px 0 0' }}>
+            書き出したJSONファイルは、マップ画面の「読み込む」で他の人が取り込めます。
+          </p>
+        </div>
+
         {stores.length > 1 && (
           <button
             type="button"
@@ -693,6 +813,114 @@ export function MapScreen() {
         )}
       </Sheet>
 
+      {/* --- 専用ジャンルの編集 --- */}
+      <Sheet
+        open={editingStoreCategory != null}
+        title="専用ジャンルの編集"
+        onClose={() => setEditingStoreCategory(null)}
+      >
+        {(() => {
+          const target = store.categories?.find((c) => c.id === editingStoreCategory)
+          if (!target) return null
+          return (
+            <>
+              <label className="field">
+                <span>名前</span>
+                <input
+                  type="text"
+                  value={target.name}
+                  onChange={(e) => updateStoreCategory(store.id, target.id, { name: e.target.value })}
+                />
+              </label>
+
+              <span className="muted">色</span>
+              <div className="row wrap" style={{ margin: '6px 0 14px' }}>
+                {PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`色 ${color}`}
+                    onClick={() => updateStoreCategory(store.id, target.id, { color })}
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: color,
+                      border: target.color === color ? '3px solid var(--text)' : '1px solid var(--border)',
+                      cursor: 'pointer',
+                    }}
+                  />
+                ))}
+              </div>
+
+              <span className="muted">判定に使う語彙（{target.keywords.length}）</span>
+              <div className="row" style={{ margin: '6px 0 8px' }}>
+                <input
+                  type="text"
+                  value={storeCategoryKeyword}
+                  placeholder="語を追加"
+                  onChange={(e) => setStoreCategoryKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing && storeCategoryKeyword.trim()) {
+                      e.preventDefault()
+                      updateStoreCategory(store.id, target.id, {
+                        keywords: [...new Set([...target.keywords, storeCategoryKeyword.trim()])],
+                      })
+                      setStoreCategoryKeyword('')
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!storeCategoryKeyword.trim()}
+                  onClick={() => {
+                    updateStoreCategory(store.id, target.id, {
+                      keywords: [...new Set([...target.keywords, storeCategoryKeyword.trim()])],
+                    })
+                    setStoreCategoryKeyword('')
+                  }}
+                >
+                  追加
+                </button>
+              </div>
+              <div className="keywords">
+                {target.keywords.map((kw) => (
+                  <span key={kw} className="kw">
+                    {kw}
+                    <button
+                      type="button"
+                      aria-label={`${kw} を削除`}
+                      onClick={() =>
+                        updateStoreCategory(store.id, target.id, {
+                          keywords: target.keywords.filter((k) => k !== kw),
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="btn danger"
+                style={{ width: '100%', marginTop: 16 }}
+                onClick={() => {
+                  if (window.confirm(`「${target.name}」を削除します。棚とリストからも外れます。`)) {
+                    deleteStoreCategory(store.id, target.id)
+                    setEditingStoreCategory(null)
+                  }
+                }}
+              >
+                この専用ジャンルを削除
+              </button>
+            </>
+          )
+        })()}
+      </Sheet>
+
       <AddStoreSheet
         open={addStoreSheet}
         onClose={() => setAddStoreSheet(false)}
@@ -703,7 +931,7 @@ export function MapScreen() {
       <AiFloorPlanSheet
         open={aiSheet}
         onClose={() => setAiSheet(false)}
-        categories={categories}
+        categories={mapCategories}
         floorId={floor.id}
         onGenerated={(layout) => importFloorLayout(store.id, floor.id, layout)}
       />
