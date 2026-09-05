@@ -1343,38 +1343,23 @@ label.field > span {
 }
 
 /* 紙吹雪・花びらの内側で、その場を奥行き方向にくるくる回り続ける
-   (画面と平行にくるくる回るのではなく、コインを弾いたときのように rotateX/rotateY で
-   裏返りながら落ちる動き。perspective を効かせて、真横を向いた瞬間は幅が細く見える)。
+   (コインを弾いたときのように rotate3d で裏返りながら落ちる動き。perspective を
+   効かせて、真横を向いた瞬間は幅が細く見える)。回転軸 (--axis-x / --axis-y) を
+   JS側で毎回ランダムな向きにすることで、常に縦か横にしか回らない不自然さをなくす。
    0deg→360degへ一定速度で回し続けるだけなので、ループの継ぎ目が見えない。 */
 .effect-spin {
   display: block;
+  animation-name: effect-spin;
   animation-iteration-count: infinite;
   animation-timing-function: linear;
 }
 
-.effect-spin.axis-x {
-  animation-name: effect-spin-x;
-}
-
-.effect-spin.axis-y {
-  animation-name: effect-spin-y;
-}
-
-@keyframes effect-spin-x {
+@keyframes effect-spin {
   from {
-    transform: perspective(300px) rotateX(0deg);
+    transform: perspective(300px) rotate3d(var(--axis-x), var(--axis-y), 0, 0deg);
   }
   to {
-    transform: perspective(300px) rotateX(360deg);
-  }
-}
-
-@keyframes effect-spin-y {
-  from {
-    transform: perspective(300px) rotateY(0deg);
-  }
-  to {
-    transform: perspective(300px) rotateY(360deg);
+    transform: perspective(300px) rotate3d(var(--axis-x), var(--axis-y), 0, 360deg);
   }
 }
 

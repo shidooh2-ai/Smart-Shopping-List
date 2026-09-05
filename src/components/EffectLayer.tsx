@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { type EffectId, effectStyle } from '../data/effects'
 import { onEffect, type EffectKind } from '../lib/effectBus'
 import { useAppStore } from '../store/useAppStore'
-import { AcornArt, BalloonArt, ConfettiArt, GlintArt, LeafArt, PetalArt, ShellArt, SparkArt, SquirrelArt } from './effectArt'
+import { AcornArt, BalloonArt, ConfettiArt, GlintArt, PetalArt, ShellArt, SparkArt, SquirrelArt } from './effectArt'
 
 interface Burst {
   id: number
@@ -86,35 +86,45 @@ interface Falling {
   duration: number
   drift: number
   swayDuration: number
-  /** その場でくるくる回り続ける速さ・向き・軸 (紙吹雪・花びらが宙で回転しながら落ちる動き)。
-   * 画面と平行に回るのではなく、コインを弾いたときのように奥行き方向に回転させる
-   * (rotateX/rotateY + perspective で、裏返るときに幅が狭く見える) */
+  /** 画面と平行な回転 (奥行き回転を加える前から使っていた、くるくる回りながら落ちる動き) */
+  spin: number
+  /** その場で回り続ける速さ・向き (紙吹雪・花びらが宙で回転しながら落ちる動き)。
+   * コインを弾いたときのように奥行き方向にも回転させる (rotate3d + perspective で、
+   * 裏返るときに幅が狭く見える)。軸を毎回ランダムな向きにすることで、縦か横にしか
+   * 回らない不自然さをなくす */
   spinDuration: number
   spinReverse: boolean
-  spinAxis: 'x' | 'y'
+  axisX: number
+  axisY: number
 }
 
 /**
- * 上から落ちてくる紙吹雪・花びら。落下 (fall) と横ゆれ (sway) を入れ子にして
+ * 上から落ちてくる紙吹雪・花びら。落下 (fall) と横ゆれ+平面回転 (sway) を入れ子にして
  * 直線的に落ちない軌跡にしたうえで、さらに内側で奥行き方向にくるくる回転させ続ける
  * (spin)。花びらは紙吹雪よりゆっくり・大きめに、それ以外の動きは共通。
  */
 function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; count: number; burst: Burst }) {
   const colors = effectStyle(burst.effectId).colors
   const [pieces] = useState<Falling[]>(() =>
-    Array.from({ length: count }, (_, i) => ({
-      id: i,
-      color: pick(colors, i),
-      left: rand(0, 100),
-      size: kind === 'petal' ? rand(12, 22) : rand(8, 14),
-      delay: rand(0, 700),
-      duration: kind === 'petal' ? rand(2400, 3600) : rand(1600, 2600),
-      drift: rand(-60, 60),
-      swayDuration: rand(700, 1400),
-      spinDuration: rand(500, 1100),
-      spinReverse: Math.random() < 0.5,
-      spinAxis: Math.random() < 0.5 ? 'x' : 'y',
-    })),
+    Array.from({ length: count }, (_, i) => {
+      // 奥行き回転の軸を毎回ランダムな向きにする (常に縦/横だけで裏返ると不自然なため)
+      const axisAngle = rand(0, Math.PI * 2)
+      return {
+        id: i,
+        color: pick(colors, i),
+        left: rand(0, 100),
+        size: kind === 'petal' ? rand(12, 22) : rand(8, 14),
+        delay: rand(0, 700),
+        duration: kind === 'petal' ? rand(2400, 3600) : rand(1600, 2600),
+        drift: rand(-60, 60),
+        swayDuration: rand(700, 1400),
+        spin: rand(-320, 320),
+        spinDuration: rand(500, 1100),
+        spinReverse: Math.random() < 0.5,
+        axisX: Math.cos(axisAngle),
+        axisY: Math.sin(axisAngle),
+      }
+    }),
   )
 
   return (
@@ -137,15 +147,17 @@ function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; coun
             className="effect-sway"
             style={
               {
-                '--spin': '0deg',
+                '--spin': `${p.spin}deg`,
                 animationDuration: `${p.swayDuration}ms`,
               } as CSSProperties
             }
           >
             <span
-              className={`effect-spin axis-${p.spinAxis}`}
+              className="effect-spin"
               style={
                 {
+                  '--axis-x': p.axisX,
+                  '--axis-y': p.axisY,
                   animationDuration: `${p.spinDuration}ms`,
                   animationDirection: p.spinReverse ? 'reverse' : 'normal',
                 } as CSSProperties
@@ -289,14 +301,14 @@ function FireworkScene({ count, burst, isComplete }: { count: number; burst: Bur
 /**
  * 「リス太」テーマ。チェック時はリス太の趣味である「どんぐり集め」らしく、
  * どんぐりが軽くポンと弾んで消える。買い終えたときはリス太本人が真ん中に登場し、
- * 周りにどんぐりと葉っぱが舞い落ちる (「ぜんぶそろったリス」のお祝いポーズ)。
+ * 周りにどんぐりが舞い落ちる (「ぜんぶそろったリス」のお祝いポーズ)。
  */
 function SquirrelScene({ count, burst, isComplete }: { count: number; burst: Burst; isComplete: boolean }) {
   if (!isComplete) return <AcornPopScene count={count} burst={burst} />
 
   return (
     <>
-      <AcornLeafShower count={count} burst={burst} />
+      <AcornShower count={count} burst={burst} />
       <SquirrelSparkles burst={burst} />
       <span className="effect-mascot">
         <SquirrelArt size={128} />
@@ -332,12 +344,11 @@ function AcornPopScene({ count, burst }: { count: number; burst: Burst }) {
   )
 }
 
-/** リス太の周りに舞い落ちるどんぐりと葉っぱ。落下の仕組みは花びら・紙吹雪と共通のものを使う。 */
-function AcornLeafShower({ count, burst }: { count: number; burst: Burst }) {
+/** リス太の周りに舞い落ちるどんぐり。落下の仕組みは花びら・紙吹雪と共通のものを使う。 */
+function AcornShower({ count, burst }: { count: number; burst: Burst }) {
   const [pieces] = useState(() =>
     Array.from({ length: count }, (_, i) => ({
       id: i,
-      kind: i % 2 === 0 ? ('acorn' as const) : ('leaf' as const),
       left: rand(4, 96),
       size: rand(14, 22),
       delay: rand(0, 900),
@@ -368,7 +379,7 @@ function AcornLeafShower({ count, burst }: { count: number; burst: Burst }) {
             className="effect-sway"
             style={{ '--spin': `${p.spin}deg`, animationDuration: `${p.swayDuration}ms` } as CSSProperties}
           >
-            {p.kind === 'acorn' ? <AcornArt size={p.size} /> : <LeafArt size={p.size} />}
+            <AcornArt size={p.size} />
           </span>
         </span>
       ))}

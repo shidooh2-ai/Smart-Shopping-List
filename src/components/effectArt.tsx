@@ -112,21 +112,6 @@ export function AcornArt({ size }: { size: number }) {
   )
 }
 
-/** 葉っぱ。どんぐりと一緒に舞わせて、木の下でお買い物完了をお祝いする雰囲気にする。 */
-export function LeafArt({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M20.5 3.5C11 3 3.5 8 3.5 15.5c0 2.4.8 4 .8 4s2.2-6.5 8-9.6c-3.4 3-5.8 7-6.6 11.6 0 0 9.6 1.6 13.4-5.6 2.4-4.6 1.4-12.4 1.4-12.4z"
-        fill="#9caf7d"
-        stroke="#7d8f61"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 /** 設定画面のエフェクト選択に出す見本 (静止画)。実際の絵柄をそのまま小さく並べる。 */
 export function EffectPreview({ id, colors }: { id: string; colors: string[] }) {
   if (id === 'petals') {
@@ -207,9 +192,6 @@ export function EffectPreview({ id, colors }: { id: string; colors: string[] }) 
         <SquirrelArt size={30} />
         <span style={{ transform: 'translateY(2px)' }}>
           <AcornArt size={12} />
-        </span>
-        <span style={{ transform: 'rotate(-10deg)' }}>
-          <LeafArt size={12} />
         </span>
       </>
     )
