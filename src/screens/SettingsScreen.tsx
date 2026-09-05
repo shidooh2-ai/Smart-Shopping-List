@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { EffectPreview } from '../components/effectArt'
 import { ViewSwitch } from '../components/ViewSwitch'
-import { EFFECTS } from '../data/effects'
+import { EFFECTS, effectStyle } from '../data/effects'
 import { THEMES } from '../data/themes'
 import { fireEffect } from '../lib/effectBus'
 import { isWakeLockSupported } from '../lib/wakeLock'
@@ -78,18 +79,22 @@ export function SettingsScreen() {
               type="button"
               aria-pressed={effectTheme === e.id}
               onClick={() => setEffectTheme(e.id)}
+              title={e.description}
             >
               <span className="effect-preview">
-                {e.completeEmoji.length > 0 ? e.completeEmoji.join(' ') : '🚫'}
+                <EffectPreview id={e.id} colors={e.colors} />
               </span>
               {e.label}
             </button>
           ))}
         </div>
+        <p className="muted" style={{ margin: '10px 0 0' }}>
+          {effectStyle(effectTheme).description}
+        </p>
         <button
           type="button"
           className="btn slim"
-          style={{ marginTop: 10 }}
+          style={{ marginTop: 8 }}
           onClick={() => fireEffect('complete')}
         >
           試す

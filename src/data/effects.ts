@@ -1,21 +1,27 @@
 /**
  * 品目チェック・お買い物完了時のお祝いエフェクト。テーマと同じく着せ替えできる。
- * 実際の見た目 (絵文字・数・完了時のメッセージ) は components/EffectLayer.tsx が
- * この設定を使って描画する。
+ *
+ * 種類ごとに「絵柄」と「動き」が違う (花びらは上から舞い散り、風船は下から昇り、
+ * 花火は打ち上がってから開く)。絵柄は components/effectArt.tsx のSVG、
+ * 動きは components/EffectLayer.tsx と styles.css のキーフレームが担当し、
+ * このファイルは粒の数・色・長さといったパラメータだけを持つ。
  */
-export type EffectId = 'default' | 'confetti' | 'sparkle' | 'fireworks' | 'minimal'
+export type EffectId = 'default' | 'confetti' | 'petals' | 'balloons' | 'fireworks' | 'minimal'
 
 export interface EffectStyle {
   id: EffectId
   label: string
-  /** 品目を1つチェックしたときに飛ばす絵文字 (空なら何も出さない) */
-  checkEmoji: string[]
-  /** チェックしたときの絵文字の数 */
+  /** 設定画面での一言説明 */
+  description: string
+  /** 品目を1つチェックしたときの粒の数 (0なら何も出さない) */
   checkCount: number
-  /** リストを全部買い終えたときに飛ばす絵文字 */
-  completeEmoji: string[]
-  /** 買い終えたときの絵文字の数 */
+  /** リストを全部買い終えたときの粒の数 (花火は「発」の数) */
   completeCount: number
+  /** 演出が消えるまでの長さ (ms)。動きが終わる前に消えないよう、動きより少し長くする */
+  checkDurationMs: number
+  completeDurationMs: number
+  /** 絵柄に使う色。粒ごとにこの中から選ぶ */
+  colors: string[]
   /** 買い終えたときに中央に出すメッセージ (nullなら出さない) */
   completeMessage: string | null
 }
@@ -24,46 +30,67 @@ export const EFFECTS: EffectStyle[] = [
   {
     id: 'default',
     label: 'ひかえめ',
-    checkEmoji: ['✓'],
-    checkCount: 1,
-    completeEmoji: ['🎉', '✨'],
-    completeCount: 12,
+    description: '光の粒がふわっと浮かびます',
+    checkCount: 3,
+    completeCount: 14,
+    checkDurationMs: 1200,
+    completeDurationMs: 2200,
+    colors: ['#ffd76a', '#fff0b8', '#ffffff', '#ffe08a'],
     completeMessage: 'お買い物完了！',
   },
   {
     id: 'confetti',
     label: '紙吹雪',
-    checkEmoji: ['🎊'],
-    checkCount: 3,
-    completeEmoji: ['🎉', '🎊', '✨', '🎈'],
-    completeCount: 28,
+    description: '上から紙吹雪がひらひら落ちてきます',
+    checkCount: 6,
+    completeCount: 44,
+    checkDurationMs: 1800,
+    completeDurationMs: 3200,
+    colors: ['#ff6b6b', '#ffd166', '#06d6a0', '#4d96ff', '#c77dff', '#ff9f1c'],
     completeMessage: 'お買い物完了！',
   },
   {
-    id: 'sparkle',
-    label: 'きらめき',
-    checkEmoji: ['✨'],
-    checkCount: 4,
-    completeEmoji: ['✨', '💫', '⭐'],
-    completeCount: 24,
-    completeMessage: 'コンプリート！',
+    id: 'petals',
+    label: '花びら',
+    description: '桜の花びらが舞い散ります',
+    checkCount: 5,
+    completeCount: 30,
+    checkDurationMs: 2400,
+    completeDurationMs: 3600,
+    colors: ['#f8bbd0', '#f48fb1', '#fce4ec', '#f06292', '#ffcdd2'],
+    completeMessage: 'お買い物完了！',
+  },
+  {
+    id: 'balloons',
+    label: '風船',
+    description: '下から風船がふわふわ上がっていきます',
+    checkCount: 2,
+    completeCount: 14,
+    checkDurationMs: 2600,
+    completeDurationMs: 3600,
+    colors: ['#ef5350', '#42a5f5', '#ffca28', '#66bb6a', '#ab47bc', '#ff7043'],
+    completeMessage: 'お買い物完了！',
   },
   {
     id: 'fireworks',
     label: '花火',
-    checkEmoji: ['💥'],
-    checkCount: 3,
-    completeEmoji: ['🎆', '🎇', '✨'],
-    completeCount: 22,
+    description: '花火が数発打ち上がります',
+    checkCount: 1,
+    completeCount: 6,
+    checkDurationMs: 1800,
+    completeDurationMs: 3600,
+    colors: ['#ffd166', '#ff6b6b', '#4dd0e1', '#c77dff', '#69f0ae', '#ff9f1c'],
     completeMessage: '花火だ！お買い物完了！',
   },
   {
     id: 'minimal',
     label: 'エフェクトなし',
-    checkEmoji: [],
+    description: '完了メッセージだけを控えめに出します',
     checkCount: 0,
-    completeEmoji: [],
     completeCount: 0,
+    checkDurationMs: 0,
+    completeDurationMs: 1600,
+    colors: [],
     completeMessage: 'お買い物完了',
   },
 ]

@@ -4,7 +4,7 @@ import { CloudSync, type CloudSyncItem } from '../lib/cloudSync'
 import { cloneDefaultCategories } from '../data/categories'
 import { PALETTE } from '../data/palette'
 import { createSampleStore } from '../data/sampleStore'
-import type { EffectId } from '../data/effects'
+import { type EffectId, isEffectId } from '../data/effects'
 import type { ThemeId } from '../data/themes'
 import { fireEffect } from '../lib/effectBus'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
@@ -1007,8 +1007,15 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'smart-shopping-list',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      // v1 → v2: エフェクトの種類を絵文字ベースから作り直したので、
+      // 無くなった種類 ('sparkle' など) を選んでいた場合はデフォルトに戻す。
+      migrate: (persisted) => {
+        const state = persisted as Partial<AppState>
+        if (isEffectId(state.effectTheme)) return state
+        return { ...state, effectTheme: 'default' as EffectId }
+      },
       partialize: ({
         stores,
         lists,

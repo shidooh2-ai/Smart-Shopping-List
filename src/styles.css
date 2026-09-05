@@ -324,6 +324,40 @@ textarea {
   background: var(--accent-weak);
 }
 
+/* 片手操作用の追加ボタン。タブバーのすぐ上、右下に浮かせる。
+   .app は max-width で中央寄せなので、広い画面では画面端ではなくアプリの右端に合わせる。 */
+.fab {
+  position: fixed;
+  right: max(16px, calc(50% - 320px + 16px));
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  z-index: 20;
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--coral);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-fab);
+  cursor: pointer;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
+
+/* スクロールに合わせて、タブバーの下へ滑り込ませる */
+.fab.hidden {
+  opacity: 0;
+  transform: translateY(calc(var(--tabbar-h) + 40px)) scale(0.8);
+  pointer-events: none;
+}
+
 /* ---------- 汎用パーツ ---------- */
 .card {
   background: var(--surface);
@@ -1171,22 +1205,29 @@ label.field > span {
   border-radius: 50%;
 }
 
-/* エフェクトの見本 (テーマと同じ theme-grid を流用し、中身だけ絵文字にする) */
+/* エフェクトの見本 (テーマと同じ theme-grid を流用し、中身を小さなSVGにする) */
 .effect-preview {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  height: 34px;
-  font-size: 18px;
+  gap: 4px;
+  height: 44px;
+  overflow: hidden;
   border: 1px solid var(--outline);
   border-radius: 8px;
   background: var(--bg);
 }
 
+.effect-preview .none {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ---------- チェック・お買い物完了のお祝いエフェクト ----------
    タブバーなどに巻き込まれないよう body 直下にポータルで描画する。クリックを奪わないように
-   pointer-events は無効にしておく。 */
+   pointer-events は無効にしておく。落下/上昇の距離 (--fall / --rise) は画面の高さを
+   JS で測って渡す (iOS では vh が実際の表示領域とずれることがあるため)。 */
 .effect-layer {
   position: fixed;
   inset: 0;
@@ -1195,39 +1236,234 @@ label.field > span {
   overflow: hidden;
 }
 
-.effect-burst {
+/* --- 上から落ちてくる (花びら・紙吹雪) --- */
+.effect-fall {
   position: absolute;
-  left: 50%;
-  top: 38%;
+  top: -60px;
+  display: block;
+  animation-name: effect-fall;
+  animation-timing-function: cubic-bezier(0.35, 0.1, 0.6, 1);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+@keyframes effect-fall {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift), var(--fall), 0);
+    opacity: 0;
+  }
+}
+
+/* 落下に横ゆれと回転を重ねる (入れ子にすることで、直線的に落ちない軌跡になる) */
+.effect-sway {
+  display: block;
+  animation-name: effect-sway;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes effect-sway {
+  from {
+    transform: translateX(-10px) rotate(0deg);
+  }
+  to {
+    transform: translateX(10px) rotate(var(--spin));
+  }
+}
+
+/* --- 下から昇っていく (風船) --- */
+.effect-rise {
+  position: absolute;
+  bottom: -140px;
+  display: block;
+  animation-name: effect-rise;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+@keyframes effect-rise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, calc(-1 * var(--rise)), 0);
+    opacity: 0;
+  }
+}
+
+.effect-balloon-sway {
+  display: block;
+  animation-name: effect-balloon-sway;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes effect-balloon-sway {
+  from {
+    transform: translateX(calc(-1 * var(--sway))) rotate(-6deg);
+  }
+  to {
+    transform: translateX(var(--sway)) rotate(6deg);
+  }
+}
+
+/* --- 打ち上げ花火 --- */
+/* 開く位置。玉はここから下へ伸ばした分だけ上がってきて、火の粉はここから開く */
+.effect-shell-origin {
+  position: absolute;
   width: 0;
   height: 0;
 }
 
-.effect-burst.complete {
-  top: 32%;
+.effect-shell {
+  position: absolute;
+  left: -3px;
+  bottom: 0;
+  display: block;
+  animation-name: effect-shell;
+  animation-timing-function: cubic-bezier(0.15, 0.6, 0.4, 1);
+  animation-fill-mode: both;
 }
 
-.effect-particle {
+@keyframes effect-shell {
+  0% {
+    transform: translate3d(0, var(--rise), 0) scaleY(0.6);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scaleY(1);
+    opacity: 0;
+  }
+}
+
+.effect-spark {
   position: absolute;
   left: 0;
   top: 0;
   opacity: 0;
-  transform: translate(-50%, -50%);
-  animation: effect-fly 900ms ease-out forwards;
+  animation-name: effect-spark;
+  animation-duration: 1300ms;
+  animation-timing-function: cubic-bezier(0.15, 0.7, 0.35, 1);
+  animation-fill-mode: both;
   will-change: transform, opacity;
 }
 
-@keyframes effect-fly {
+/* 開いたあと、重力で少し垂れながら消える */
+@keyframes effect-spark {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--angle)) scale(0.3);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--dx), calc(var(--dy) + 34px), 0) rotate(var(--angle)) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 開いた瞬間の閃光。色は玉と同じものを EffectLayer 側から流し込む */
+.effect-flash {
+  position: absolute;
+  left: -55px;
+  top: -55px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  opacity: 0;
+  animation-name: effect-flash;
+  animation-duration: 520ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes effect-flash {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* 花火のときだけ、夜空に見えるよう画面をふわっと暗くする */
+.effect-nightsky {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 35%, rgba(10, 14, 40, 0.5), rgba(4, 6, 22, 0.74));
+  opacity: 0;
+  animation: effect-nightsky 3400ms ease-in-out both;
+}
+
+@keyframes effect-nightsky {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
   }
-  18% {
+  12% {
+    opacity: 1;
+  }
+  72% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.05) rotate(var(--rot));
+  }
+}
+
+/* --- ひかえめ (光の粒) --- */
+.effect-glint {
+  position: absolute;
+  opacity: 0;
+  animation-name: effect-glint;
+  animation-duration: 1100ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes effect-glint {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.3);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+    transform: translate3d(0, calc(var(--lift) * 0.3), 0) scale(1);
+  }
+  100% {
+    transform: translate3d(0, var(--lift), 0) scale(0.7);
+    opacity: 0;
   }
 }
 

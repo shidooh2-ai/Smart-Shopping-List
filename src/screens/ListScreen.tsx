@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { type UIEvent, useMemo, useRef, useState } from 'react'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
@@ -54,9 +54,26 @@ export function ListScreen() {
   const [pickerItem, setPickerItem] = useState<string | null>(null)
   const [listSheetMode, setListSheetMode] = useState<ListSheetMode | null>(null)
   const [purchasedSheet, setPurchasedSheet] = useState(false)
+  const [addSheet, setAddSheet] = useState(false)
+  const [sheetDraft, setSheetDraft] = useState('')
+  const [fabVisible, setFabVisible] = useState(true)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const sheetInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const lastScrollTop = useRef(0)
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+
+  /**
+   * 下へスクロール中は追加ボタンを引っ込め、上へ戻したときと先頭付近では出す。
+   * 本文の上に常時かぶらないようにするための処理。
+   */
+  const onScreenScroll = (e: UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop
+    const delta = top - lastScrollTop.current
+    if (Math.abs(delta) < 6) return
+    lastScrollTop.current = top
+    setFabVisible(delta < 0 || top < 40)
+  }
 
   if (!list) {
     return (
@@ -77,6 +94,14 @@ export function ListScreen() {
     addItems(list.id, draft)
     setDraft('')
     inputRef.current?.focus()
+  }
+
+  /** 右下の追加ボタンから開くシート。続けて何個も足せるよう、追加後も開いたままにする。 */
+  const submitFromSheet = () => {
+    if (!sheetDraft.trim()) return
+    addItems(list.id, sheetDraft)
+    setSheetDraft('')
+    sheetInputRef.current?.focus()
   }
 
   const remaining = list.items.filter((i) => !i.checked).length
@@ -104,7 +129,7 @@ export function ListScreen() {
   const editing = pickerItem ? list.items.find((i) => i.id === pickerItem) : null
 
   return (
-    <div className="screen">
+    <div className="screen" onScroll={onScreenScroll}>
       <div className="card">
         <div className="row" style={{ marginBottom: 10 }}>
           <span
@@ -267,6 +292,63 @@ export function ListScreen() {
           </div>
         </div>
       )}
+
+      {/* 画面上部の追加欄は親指から遠いので、片手で届く右下にも追加ボタンを置く。
+          本文が読めなくならないよう、下方向へスクロール中は引っ込める。 */}
+      <button
+        type="button"
+        className={`fab${fabVisible ? '' : ' hidden'}`}
+        onClick={() => {
+          setAddSheet(true)
+          setFabVisible(true)
+        }}
+        aria-label="買うものを追加"
+      >
+        <span aria-hidden="true">＋</span>
+      </button>
+
+      <Sheet
+        open={addSheet}
+        title="買うものを追加"
+        onClose={() => {
+          setAddSheet(false)
+          setSheetDraft('')
+        }}
+        footer={
+          <button
+            type="button"
+            className="btn primary"
+            style={{ width: '100%' }}
+            onClick={submitFromSheet}
+            disabled={!sheetDraft.trim()}
+          >
+            追加
+          </button>
+        }
+      >
+        <textarea
+          ref={sheetInputRef}
+          rows={2}
+          autoFocus
+          value={sheetDraft}
+          placeholder="買うもの（例: 牛乳、にんじん 2本）"
+          onChange={(e) => setSheetDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              submitFromSheet()
+            }
+          }}
+        />
+        <p className="muted" style={{ marginBottom: 0 }}>
+          改行や読点で区切ると、まとめて追加できます。追加してもこの画面は開いたままなので、続けて入力できます。
+        </p>
+        {list.items.length > 0 && (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            いま {list.items.length} 件（未購入 {remaining} 件）
+          </p>
+        )}
+      </Sheet>
 
       <PurchasedSheet open={purchasedSheet} onClose={() => setPurchasedSheet(false)} categories={categories} />
 
