@@ -597,54 +597,13 @@ label.field > span {
   gap: 8px;
 }
 
-/* 品目の行。削除ボタンを常時は出さず、裏に隠しておいて左右のスワイプで見せる
-   (メールアプリのアーカイブ操作と同じ)。.item-row が土台で、.item がその上に
-   乗って左右にスライドする。 */
-.item-row {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius);
-}
-
-.item-action {
-  appearance: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 76px;
-  border: 0;
-  background: var(--danger);
-  color: #fff;
-  font-size: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.item-action.left {
-  left: 0;
-}
-
-.item-action.right {
-  right: 0;
-}
-
 .item {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 10px 10px 12px;
   background: var(--surface-2);
   border-radius: var(--radius);
-  touch-action: pan-y;
-  transition: transform 0.2s ease;
-}
-
-.item.dragging {
-  transition: none;
 }
 
 .item.done {

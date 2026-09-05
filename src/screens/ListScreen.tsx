@@ -1,4 +1,4 @@
-import { type MouseEvent, type PointerEvent, type UIEvent, useMemo, useRef, useState } from 'react'
+import { type UIEvent, useMemo, useRef, useState } from 'react'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
@@ -35,7 +35,6 @@ export function ListScreen() {
   const {
     addItems,
     toggleItem,
-    removeItem,
     renameItem,
     setItemCategory,
     clearChecked,
@@ -257,7 +256,6 @@ export function ListScreen() {
                     category={item.categoryId ? (byId.get(item.categoryId) ?? null) : null}
                     onToggle={() => toggleItem(list.id, item.id)}
                     onRename={(t) => renameItem(list.id, item.id, t)}
-                    onRemove={() => removeItem(list.id, item.id)}
                     onPickCategory={() => setPickerItem(item.id)}
                   />
                 ))}
@@ -708,137 +706,56 @@ interface ItemRowProps {
   category: Category | null
   onToggle: () => void
   onRename: (text: string) => void
-  onRemove: () => void
   onPickCategory: () => void
 }
 
-/** 削除ボタンが出るまでスワイプする距離 (メールアプリのアーカイブ操作と同じ動き)。 */
-const SWIPE_ACTION_WIDTH = 76
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
-
-function ItemRow({ item, category, onToggle, onRename, onRemove, onPickCategory }: ItemRowProps) {
+/** 品目1件の行。個別の削除ボタンは置かず、削除は下の「まとめて削除」(チェック済みだけ) に一本化している。 */
+function ItemRow({ item, category, onToggle, onRename, onPickCategory }: ItemRowProps) {
   const [text, setText] = useState(item.text)
   const uncertain = !item.manual && item.confidence > 0 && item.confidence < 0.8
 
-  // チェックマークのすぐ横に削除ボタンがあると誤タップしやすいので、常時は隠しておき、
-  // 左右どちらかにスワイプしたときだけ裏の削除ボタンを見せる (メールアプリのアーカイブ操作と同じ)。
-  const [offset, setOffset] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const dragStart = useRef<{ x: number; y: number; startOffset: number; active: boolean } | null>(null)
-  // ドラッグで開閉した直後に発生する click を無視するためのフラグ (無視しないと、
-  // 開いた瞬間にそのclickでまた閉じてしまう)。
-  const suppressNextClick = useRef(false)
-
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    dragStart.current = { x: e.clientX, y: e.clientY, startOffset: offset, active: false }
-  }
-
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const start = dragStart.current
-    if (!start) return
-    const dx = e.clientX - start.x
-    const dy = e.clientY - start.y
-    if (!start.active) {
-      if (Math.abs(dx) < 8) return
-      if (Math.abs(dy) > Math.abs(dx)) {
-        // 縦方向の動きが大きい場合はリストのスクロールとみなし、スワイプ扱いしない
-        dragStart.current = null
-        return
-      }
-      start.active = true
-      setDragging(true)
-      e.currentTarget.setPointerCapture(e.pointerId)
-    }
-    setOffset(clamp(start.startOffset + dx, -SWIPE_ACTION_WIDTH, SWIPE_ACTION_WIDTH))
-  }
-
-  const endDrag = () => {
-    const start = dragStart.current
-    dragStart.current = null
-    if (!start?.active) return
-    setDragging(false)
-    suppressNextClick.current = true
-    setOffset((current) => {
-      if (current <= -SWIPE_ACTION_WIDTH / 2) return -SWIPE_ACTION_WIDTH
-      if (current >= SWIPE_ACTION_WIDTH / 2) return SWIPE_ACTION_WIDTH
-      return 0
-    })
-  }
-
-  /** 開いた状態でタップしたら、中のボタンを操作させず閉じるだけにする (メールアプリと同じ)。 */
-  const onContentClickCapture = (e: MouseEvent<HTMLDivElement>) => {
-    if (suppressNextClick.current) {
-      suppressNextClick.current = false
-      e.preventDefault()
-      e.stopPropagation()
-      return
-    }
-    if (offset !== 0) {
-      e.preventDefault()
-      e.stopPropagation()
-      setOffset(0)
-    }
-  }
-
   return (
-    <li className="item-row">
-      <button type="button" className="item-action left" onClick={onRemove} aria-label={`${item.text} を削除`}>
-        🗑
-      </button>
-      <button type="button" className="item-action right" onClick={onRemove} aria-label={`${item.text} を削除`}>
-        🗑
-      </button>
-      <div
-        className={`item${item.checked ? ' done' : ''}${dragging ? ' dragging' : ''}`}
-        style={{ transform: `translateX(${offset}px)` }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onClickCapture={onContentClickCapture}
-      >
+    <li className={`item${item.checked ? ' done' : ''}`}>
+      <button
+        type="button"
+        className="swatch"
+        style={{ background: category?.color ?? 'var(--outline)' }}
+        onClick={onPickCategory}
+        aria-label={category ? `ジャンル: ${category.name}` : 'ジャンルを選ぶ'}
+      />
+      <div className="body">
+        <input
+          className="name"
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            const next = text.trim()
+            if (next && next !== item.text) onRename(next)
+            else setText(item.text)
+          }}
+        />
         <button
           type="button"
-          className="swatch"
-          style={{ background: category?.color ?? 'var(--outline)' }}
+          className={`chip${category ? '' : ' unknown'}${uncertain ? ' guess' : ''}`}
           onClick={onPickCategory}
-          aria-label={category ? `ジャンル: ${category.name}` : 'ジャンルを選ぶ'}
-        />
-        <div className="body">
-          <input
-            className="name"
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={() => {
-              const next = text.trim()
-              if (next && next !== item.text) onRename(next)
-              else setText(item.text)
-            }}
-          />
-          <button
-            type="button"
-            className={`chip${category ? '' : ' unknown'}${uncertain ? ' guess' : ''}`}
-            onClick={onPickCategory}
-            title={uncertain ? '自動判定の確信度が低めです' : undefined}
-          >
-            {category ? category.name : 'ジャンル未設定'}
-          </button>
-          {item.addedBy && (
-            <span className="muted" style={{ marginLeft: 8 }}>
-              追加: {item.addedBy}
-            </span>
-          )}
-        </div>
-        <input
-          className="check"
-          type="checkbox"
-          checked={item.checked}
-          onChange={onToggle}
-          aria-label={`${item.text} を購入済みにする`}
-        />
+          title={uncertain ? '自動判定の確信度が低めです' : undefined}
+        >
+          {category ? category.name : 'ジャンル未設定'}
+        </button>
+        {item.addedBy && (
+          <span className="muted" style={{ marginLeft: 8 }}>
+            追加: {item.addedBy}
+          </span>
+        )}
       </div>
+      <input
+        className="check"
+        type="checkbox"
+        checked={item.checked}
+        onChange={onToggle}
+        aria-label={`${item.text} を購入済みにする`}
+      />
     </li>
   )
 }
