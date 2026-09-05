@@ -26,31 +26,8 @@ import WidgetKit
  */
 
 // MARK: - 表示するリストの選択 (ウィジェットを長押し → ウィジェットを編集)
-
-@available(iOS 17.0, *)
-struct ListEntity: AppEntity {
-    var id: String
-    var name: String
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { "買い物リスト" }
-    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
-    static var defaultQuery = ListEntityQuery()
-}
-
-@available(iOS 17.0, *)
-struct ListEntityQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [ListEntity] {
-        allLists().filter { identifiers.contains($0.id) }
-    }
-
-    func suggestedEntities() async throws -> [ListEntity] {
-        allLists()
-    }
-
-    private func allLists() -> [ListEntity] {
-        (SharedStore.loadSnapshot()?.lists ?? []).map { ListEntity(id: $0.id, name: $0.name) }
-    }
-}
+// ListEntity/ListEntityQuery は App/ShoppingListIntents.swift (Siriショートカット) からも
+// 使うため、両ターゲットに含める SharedSnapshot.swift 側に定義を移した。
 
 @available(iOS 17.0, *)
 struct SelectListIntent: WidgetConfigurationIntent {

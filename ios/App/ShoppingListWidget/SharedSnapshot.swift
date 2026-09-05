@@ -1,13 +1,14 @@
+import AppIntents
 import Foundation
 
 /**
- アプリ本体とウィジェットの間でやり取りするデータ。
+ アプリ本体とウィジェット・Siriショートカットの間でやり取りするデータ。
 
- WKWebView の localStorage はウィジェットからは読めないため、アプリ側 (WidgetBridgePlugin) が
- App Group の共有 UserDefaults に JSON のスナップショットを書き出し、ウィジェットはそれを読む。
+ WKWebView の localStorage はウィジェット/Siriからは読めないため、アプリ側 (WidgetBridgePlugin) が
+ App Group の共有 UserDefaults に JSON のスナップショットを書き出し、それらはそれを読む。
 
- ウィジェット側でチェックを付けた場合は、逆方向に「未反映の変更」として積んでおき、
- アプリが次に起動/復帰したときにまとめて取り込む (ウィジェットから localStorage は書けないため)。
+ 逆方向 (ウィジェットでチェックを付けた/Siriで品目を追加した) は「未反映の変更」として積んでおき、
+ アプリが次に起動/復帰したときにまとめて取り込む (ウィジェット/Siri側から localStorage は書けないため)。
 
  ※ このファイルはアプリ本体ターゲットとウィジェット拡張ターゲットの両方に含めること
     (Xcode の Target Membership で両方にチェックを入れる)。
@@ -18,6 +19,7 @@ enum SharedStore {
 
     private static let snapshotKey = "widget.snapshot"
     private static let pendingKey = "widget.pendingChanges"
+    private static let pendingAddsKey = "widget.pendingAdds"
     private static let pagePrefix = "widget.page."
 
     static var defaults: UserDefaults? {
@@ -79,6 +81,24 @@ enum SharedStore {
         return updated
     }
 
+    // MARK: - 未反映の追加 (Siriショートカット → アプリ)
+
+    static func loadPendingAdds() -> [PendingAdd] {
+        guard let json = defaults?.string(forKey: pendingAddsKey), let data = json.data(using: .utf8) else { return [] }
+        return (try? JSONDecoder().decode([PendingAdd].self, from: data)) ?? []
+    }
+
+    static func appendPendingAdd(_ add: PendingAdd) {
+        var adds = loadPendingAdds()
+        adds.append(add)
+        guard let data = try? JSONEncoder().encode(adds), let json = String(data: data, encoding: .utf8) else { return }
+        defaults?.set(json, forKey: pendingAddsKey)
+    }
+
+    static func clearPendingAdds() {
+        defaults?.removeObject(forKey: pendingAddsKey)
+    }
+
     // MARK: - ページ位置 (ウィジェットはスクロールできないのでページ送りで代用する)
 
     static func page(listId: String) -> Int {
@@ -125,4 +145,41 @@ struct PendingChange: Codable {
     var itemId: String
     var checked: Bool
     var at: Double
+}
+
+/// Siriショートカットで追加された品目。まだジャンル判定もしていない生のテキストのまま積んでおき、
+/// アプリ側の addItems() (既存のジャンル自動判定・言い換え学習ロジック) にそのまま渡す。
+struct PendingAdd: Codable {
+    var listId: String
+    var text: String
+    var at: Double
+}
+
+// MARK: - Siriショートカット/ウィジェット設定で「どの買い物リストか」を選ぶための AppEntity
+// ウィジェット (iOS 17+) と Siriショートカット (iOS 16+) の両方から使うため、
+// 両者に共通する下限の iOS 16.0 を指定している。
+
+@available(iOS 16.0, *)
+struct ListEntity: AppEntity {
+    var id: String
+    var name: String
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "買い物リスト" }
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+    static var defaultQuery = ListEntityQuery()
+}
+
+@available(iOS 16.0, *)
+struct ListEntityQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [ListEntity] {
+        allLists().filter { identifiers.contains($0.id) }
+    }
+
+    func suggestedEntities() async throws -> [ListEntity] {
+        allLists()
+    }
+
+    private func allLists() -> [ListEntity] {
+        (SharedStore.loadSnapshot()?.lists ?? []).map { ListEntity(id: $0.id, name: $0.name) }
+    }
 }

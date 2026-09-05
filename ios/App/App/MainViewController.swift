@@ -23,5 +23,11 @@ class MainViewController: CAPBridgeViewController {
         // (ウィジェット自体には App Group が必要で、これも有料登録が前提)
         // 手順は ios/App/ShoppingListWidget/ShoppingListWidget.swift の冒頭コメント参照。
         // bridge?.registerPluginInstance(WidgetBridgePlugin())
+
+        // 参考: Siriショートカット (App/ShoppingListIntents.swift) はCapacitorプラグインではなく
+        // AppIntents/AppShortcutsProviderなので、ここでの registerPluginInstance は不要
+        // (バイナリのメタデータから自動的に認識される)。ただしファイル自体はXcodeで
+        // アプリ本体ターゲットに追加する必要があり、必要なcapabilityはウィジェットと共通の
+        // App Groupsのみ (iCloud/Push Notificationsは不要)。詳しくはそのファイルの冒頭コメント参照。
     }
 }

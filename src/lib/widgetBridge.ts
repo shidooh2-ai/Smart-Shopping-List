@@ -4,15 +4,16 @@ import { useAppStore } from '../store/useAppStore'
 import type { Category, ShoppingList } from '../types'
 
 /**
- * ホーム画面ウィジェット (iOS) との橋渡し。実体は ios/App/App/WidgetBridgePlugin.swift。
+ * ホーム画面ウィジェット・Siriショートカット (iOS) との橋渡し。実体は ios/App/App/WidgetBridgePlugin.swift。
  *
- * ウィジェットからは WKWebView の localStorage を読めないため、リストの内容を App Group の
- * 共有領域へ書き出す。逆にウィジェット上で付けたチェックは「未反映の変更」として積まれるので、
- * 起動時とフォアグラウンド復帰時に取り込む。
+ * ウィジェット/Siriからは WKWebView の localStorage を読めないため、リストの内容を App Group の
+ * 共有領域へ書き出す。逆にウィジェット上で付けたチェックや、Siriショートカットで追加した品目は
+ * 「未反映の変更」として積まれるので、起動時とフォアグラウンド復帰時に取り込む。
  *
  * App Group の entitlement が無い間 (無料のPersonal Team) はネイティブ側が available:false を
  * 返すので、この配線は何もしない。有効化の手順は
- * ios/App/ShoppingListWidget/ShoppingListWidget.swift の冒頭コメントを参照。
+ * ios/App/ShoppingListWidget/ShoppingListWidget.swift、Siriショートカットは
+ * ios/App/App/ShoppingListIntents.swift の冒頭コメントを参照。
  */
 
 export interface WidgetPendingChange {
@@ -22,11 +23,19 @@ export interface WidgetPendingChange {
   at: number
 }
 
+export interface WidgetPendingAdd {
+  listId: string
+  text: string
+  at: number
+}
+
 interface WidgetBridgePluginApi {
   isAvailable(): Promise<{ available: boolean }>
   writeSnapshot(options: { json: string }): Promise<{ written: boolean }>
   readPendingChanges(): Promise<{ changes: WidgetPendingChange[] }>
   clearPendingChanges(): Promise<{ cleared: boolean }>
+  readPendingAdds(): Promise<{ adds: WidgetPendingAdd[] }>
+  clearPendingAdds(): Promise<{ cleared: boolean }>
 }
 
 export const WidgetBridge = registerPlugin<WidgetBridgePluginApi>('WidgetBridge')
@@ -98,6 +107,18 @@ async function applyPendingChanges(): Promise<void> {
   await WidgetBridge.clearPendingChanges()
 }
 
+/** Siriショートカットで追加された品目をアプリ側に取り込む (ジャンル判定は addItems 内の既存ロジックに任せる)。 */
+async function applyPendingAdds(): Promise<void> {
+  const { adds } = await WidgetBridge.readPendingAdds()
+  if (adds.length === 0) return
+  const { lists, addItems } = useAppStore.getState()
+  for (const add of adds) {
+    const list = lists.find((l) => l.id === add.listId)
+    if (list) addItems(add.listId, add.text)
+  }
+  await WidgetBridge.clearPendingAdds()
+}
+
 export function startWidgetBridge(): void {
   if (started || !isWidgetPlatform()) return
   started = true
@@ -107,11 +128,13 @@ export function startWidgetBridge(): void {
     if (!available) return
 
     await applyPendingChanges().catch(() => {})
+    await applyPendingAdds().catch(() => {})
     await WidgetBridge.writeSnapshot({ json: currentSnapshotJson() }).catch(() => {})
 
     void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) return
       void applyPendingChanges().catch(() => {})
+      void applyPendingAdds().catch(() => {})
     })
 
     let timer: ReturnType<typeof setTimeout> | null = null
