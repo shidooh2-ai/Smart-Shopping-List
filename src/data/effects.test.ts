@@ -36,6 +36,7 @@ describe('isEffectId', () => {
   it('現在のIDを受け付ける', () => {
     expect(isEffectId('petals')).toBe(true)
     expect(isEffectId('fireworks')).toBe(true)
+    expect(isEffectId('squirrel')).toBe(true)
     expect(isEffectId('minimal')).toBe(true)
   })
 

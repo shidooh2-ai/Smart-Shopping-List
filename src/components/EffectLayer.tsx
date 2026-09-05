@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { type EffectId, effectStyle } from '../data/effects'
 import { onEffect, type EffectKind } from '../lib/effectBus'
 import { useAppStore } from '../store/useAppStore'
-import { BalloonArt, ConfettiArt, GlintArt, PetalArt, ShellArt, SparkArt } from './effectArt'
+import { AcornArt, BalloonArt, ConfettiArt, GlintArt, LeafArt, PetalArt, ShellArt, SparkArt, SquirrelArt } from './effectArt'
 
 interface Burst {
   id: number
@@ -70,6 +70,7 @@ function EffectScene({ burst }: { burst: Burst }) {
       {burst.effectId === 'confetti' && <FallingScene kind="confetti" count={count} burst={burst} />}
       {burst.effectId === 'balloons' && <BalloonScene count={count} burst={burst} />}
       {burst.effectId === 'fireworks' && <FireworkScene count={count} burst={burst} isComplete={isComplete} />}
+      {burst.effectId === 'squirrel' && <SquirrelScene count={count} burst={burst} isComplete={isComplete} />}
       {burst.effectId === 'default' && <GlintScene count={count} burst={burst} />}
       {isComplete && style.completeMessage && <div className="effect-toast">{style.completeMessage}</div>}
     </>
@@ -262,6 +263,133 @@ function FireworkScene({ count, burst, isComplete }: { count: number; burst: Bur
             className="effect-flash"
             style={{ background: `radial-gradient(circle, ${shell.color} 0%, transparent 70%)`, animationDelay: `${shell.delay + RISE_MS}ms` }}
           />
+        </span>
+      ))}
+    </>
+  )
+}
+
+/**
+ * 「リス太」テーマ。チェック時はリス太の趣味である「どんぐり集め」らしく、
+ * どんぐりが軽くポンと弾んで消える。買い終えたときはリス太本人が真ん中に登場し、
+ * 周りにどんぐりと葉っぱが舞い落ちる (「ぜんぶそろったリス」のお祝いポーズ)。
+ */
+function SquirrelScene({ count, burst, isComplete }: { count: number; burst: Burst; isComplete: boolean }) {
+  if (!isComplete) return <AcornPopScene count={count} burst={burst} />
+
+  return (
+    <>
+      <AcornLeafShower count={count} burst={burst} />
+      <SquirrelSparkles burst={burst} />
+      <span className="effect-mascot">
+        <SquirrelArt size={128} happy />
+      </span>
+    </>
+  )
+}
+
+/** どんぐりが軽く弾んで消える (品目チェック用)。 */
+function AcornPopScene({ count, burst }: { count: number; burst: Burst }) {
+  const [acorns] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: rand(24, 76),
+      top: rand(0.34, 0.58) * burst.screenHeight,
+      size: rand(18, 26),
+      delay: rand(0, 180),
+    })),
+  )
+
+  return (
+    <>
+      {acorns.map((a) => (
+        <span
+          key={a.id}
+          className="effect-acorn-pop"
+          style={{ left: `${a.left}%`, top: a.top, animationDelay: `${a.delay}ms` } as CSSProperties}
+        >
+          <AcornArt size={a.size} />
+        </span>
+      ))}
+    </>
+  )
+}
+
+/** リス太の周りに舞い落ちるどんぐりと葉っぱ。落下の仕組みは花びら・紙吹雪と共通のものを使う。 */
+function AcornLeafShower({ count, burst }: { count: number; burst: Burst }) {
+  const [pieces] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      kind: i % 2 === 0 ? ('acorn' as const) : ('leaf' as const),
+      left: rand(4, 96),
+      size: rand(14, 22),
+      delay: rand(0, 900),
+      duration: rand(1900, 2800),
+      drift: rand(-50, 50),
+      spin: rand(-320, 320),
+      swayDuration: rand(800, 1500),
+    })),
+  )
+
+  return (
+    <>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="effect-fall"
+          style={
+            {
+              left: `${p.left}%`,
+              '--fall': `${burst.screenHeight + 80}px`,
+              '--drift': `${p.drift}px`,
+              animationDelay: `${p.delay}ms`,
+              animationDuration: `${p.duration}ms`,
+            } as CSSProperties
+          }
+        >
+          <span
+            className="effect-sway"
+            style={{ '--spin': `${p.spin}deg`, animationDuration: `${p.swayDuration}ms` } as CSSProperties}
+          >
+            {p.kind === 'acorn' ? <AcornArt size={p.size} /> : <LeafArt size={p.size} />}
+          </span>
+        </span>
+      ))}
+    </>
+  )
+}
+
+/** リス太の周りで瞬く、小さなきらめき。 */
+function SquirrelSparkles({ burst }: { burst: Burst }) {
+  const colors = effectStyle(burst.effectId).colors
+  const [glints] = useState(() =>
+    Array.from({ length: 5 }, (_, i) => ({
+      id: i,
+      color: pick(colors, i),
+      left: rand(28, 72),
+      top: rand(0.24, 0.56) * burst.screenHeight,
+      size: rand(9, 16),
+      delay: rand(150, 700),
+      lift: rand(30, 70),
+    })),
+  )
+
+  return (
+    <>
+      {glints.map((g) => (
+        <span
+          key={g.id}
+          className="effect-glint"
+          style={
+            {
+              left: `${g.left}%`,
+              top: g.top,
+              '--lift': `${-g.lift}px`,
+              animationDelay: `${g.delay}ms`,
+            } as CSSProperties
+          }
+        >
+          <GlintArt color={g.color} size={g.size} />
         </span>
       ))}
     </>

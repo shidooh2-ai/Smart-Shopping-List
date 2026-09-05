@@ -6,7 +6,7 @@
  * 動きは components/EffectLayer.tsx と styles.css のキーフレームが担当し、
  * このファイルは粒の数・色・長さといったパラメータだけを持つ。
  */
-export type EffectId = 'default' | 'confetti' | 'petals' | 'balloons' | 'fireworks' | 'minimal'
+export type EffectId = 'default' | 'confetti' | 'petals' | 'balloons' | 'fireworks' | 'squirrel' | 'minimal'
 
 export interface EffectStyle {
   id: EffectId
@@ -81,6 +81,18 @@ export const EFFECTS: EffectStyle[] = [
     completeDurationMs: 3600,
     colors: ['#ffd166', '#ff6b6b', '#4dd0e1', '#c77dff', '#69f0ae', '#ff9f1c'],
     completeMessage: '花火だ！お買い物完了！',
+  },
+  {
+    id: 'squirrel',
+    label: 'リス太',
+    description: 'アプリのキャラクター「リス太」が、どんぐりを集めてお祝いします',
+    checkCount: 2,
+    completeCount: 12,
+    checkDurationMs: 900,
+    completeDurationMs: 3000,
+    // 絵柄自体はキャラクターの固定色を使うので、ここはキラキラの色だけに使う
+    colors: ['#ffd76a', '#9caf7d', '#f0a992', '#fff0b8'],
+    completeMessage: 'ぜんぶそろったリス！',
   },
   {
     id: 'minimal',
