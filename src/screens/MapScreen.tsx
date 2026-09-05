@@ -8,11 +8,9 @@ import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
 import { fileToBackgroundImage } from '../lib/aiFloorPlan'
-import { exportJsonFile } from '../lib/exportFile'
 import { combinedCategories } from '../lib/genre'
 import { cellAt, nodePos } from '../lib/grid'
 import { newId } from '../lib/id'
-import { encodeFloorCells } from '../lib/mapCodec'
 import { NODE_STYLE } from '../lib/mapStyle'
 import { type PaintTool, useAppStore } from '../store/useAppStore'
 import type { NodeKind, StoreMap } from '../types'
@@ -79,7 +77,6 @@ export function MapScreen() {
     addStoreCategory,
     updateStoreCategory,
     deleteStoreCategory,
-    importStoreMap,
   } = useAppStore()
 
   const [storeId, setStoreId] = useState<string | null>(stores[0]?.id ?? null)
@@ -100,7 +97,6 @@ export function MapScreen() {
   const [mapOverlayOpacity, setMapOverlayOpacity] = useState(1)
   const shelfRef = useRef<string | null>(null)
   const bgFileRef = useRef<HTMLInputElement | null>(null)
-  const importMapFileRef = useRef<HTMLInputElement | null>(null)
 
   const store: StoreMap | null = stores.find((s) => s.id === storeId) ?? stores[0] ?? null
   const floor = store ? (store.floors.find((f) => f.id === floorId) ?? store.floors[0]) : null
@@ -199,36 +195,6 @@ export function MapScreen() {
     }
   }
 
-  /** 配布用に書き出されたマップ (店舗設定の「書き出す」で作ったもの) を、新しい店舗として取り込む。 */
-  const importMapFile = async (file: File) => {
-    try {
-      const data = JSON.parse(await file.text())
-      const id = importStoreMap(data)
-      if (!id) throw new Error('マップの形式が違います')
-      switchToStore(id)
-      window.alert('店舗を追加しました。')
-    } catch (e) {
-      window.alert(`読み込めませんでした: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
-  /** この店舗のマップを配布用のJSONとして書き出す。withCategories なら専用ジャンルも含める。 */
-  const exportMap = (withCategories: boolean) => {
-    const safeName = store.name.replace(/[\\/:*?"<>|]/g, '_')
-    const { cloud: _cloud, categories: storeCategories, ...rest } = store
-    // マスの並びは棚・通路の繰り返しばかりで書き出しJSONの大半を占めるため、
-    // ランレングス圧縮した形 (mapCodec.ts) に変換してから書き出す。
-    const compact = { ...rest, floors: rest.floors.map((f) => encodeFloorCells(f, rest.shelves, rest.nodes)) }
-    const payload = JSON.stringify({
-      app: 'smart-shopping-list',
-      kind: 'store-map',
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      store: withCategories ? { ...compact, categories: storeCategories } : compact,
-    })
-    void exportJsonFile(`${safeName}${withCategories ? '-map-genres' : '-map'}.json`, payload)
-  }
-
   return (
     <div className="screen">
       <ViewSwitch options={SETTINGS_VIEWS} active="map" onChange={setSettingsView} />
@@ -247,21 +213,7 @@ export function MapScreen() {
           <button type="button" className="btn slim" onClick={() => setStoreSheet(true)}>
             店舗設定
           </button>
-          <button type="button" className="btn slim" onClick={() => importMapFileRef.current?.click()}>
-            読み込む
-          </button>
         </div>
-        <input
-          ref={importMapFileRef}
-          type="file"
-          accept="application/json,.json"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void importMapFile(f)
-            e.target.value = ''
-          }}
-        />
       </div>
 
       <div className="card">
@@ -776,22 +728,9 @@ export function MapScreen() {
           )}
         </div>
 
-        <div style={{ margin: '14px 0' }}>
-          <span className="muted" style={{ display: 'block', marginBottom: 6 }}>
-            配布用に書き出す
-          </span>
-          <div className="row wrap">
-            <button type="button" className="btn slim" onClick={() => exportMap(false)}>
-              マップを書き出す
-            </button>
-            <button type="button" className="btn slim" onClick={() => exportMap(true)}>
-              マップ＋専用ジャンルを書き出す
-            </button>
-          </div>
-          <p className="muted" style={{ margin: '6px 0 0' }}>
-            書き出したJSONファイルは、マップ画面の「読み込む」で他の人が取り込めます。
-          </p>
-        </div>
+        <p className="muted" style={{ margin: '14px 0' }}>
+          マップの配布用の書き出し・読み込みは「設定」タブから行えます。
+        </p>
 
         {stores.length > 1 && (
           <button

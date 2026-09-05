@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeFloorCells, encodeFloorCells } from './mapCodec'
+import { decodeFloorCells, decodeImportedStoreMap, encodeFloorCells } from './mapCodec'
 import type { Cell, Floor, MapNode, Shelf } from '../types'
 
 const shelves: Shelf[] = [
@@ -78,5 +78,67 @@ describe('mapCodec: encodeFloorCells / decodeFloorCells', () => {
   it('不明なマスコードを読み込もうとするとエラーになる', () => {
     const compact = { ...floorWithCells([], 1, 1), runs: [['?', 1]] as [string, number][] }
     expect(() => decodeFloorCells(compact, shelves, nodes)).toThrow()
+  })
+})
+
+describe('mapCodec: decodeImportedStoreMap', () => {
+  const cells: Cell[] = [{ k: 'shelf', shelfId: 'shelf_a' }, { k: 'aisle' }]
+  const floor = floorWithCells(cells, 2, 1)
+  const exported = {
+    app: 'smart-shopping-list',
+    kind: 'store-map',
+    version: 2,
+    store: {
+      id: 'store_original',
+      name: 'サンプル店舗',
+      floors: [encodeFloorCells(floor, shelves, nodes)],
+      shelves,
+      nodes,
+      cellMeters: 1.2,
+      createdAt: 1000,
+      updatedAt: 2000,
+    },
+  }
+
+  it('封筒形式 ({ store: {...} }) を StoreMap に変換できる', () => {
+    const store = decodeImportedStoreMap(exported)
+    expect(store).not.toBeNull()
+    expect(store!.name).toBe('サンプル店舗')
+    expect(store!.floors[0].cells).toEqual(cells)
+  })
+
+  it('StoreMap そのものの形式 (封筒無し) も受け付ける', () => {
+    const store = decodeImportedStoreMap(exported.store)
+    expect(store?.name).toBe('サンプル店舗')
+  })
+
+  it('元のJSONに書かれた id をそのまま使う (新しく振り直さない)', () => {
+    // 同じ id のマップを再度読み込んだとき「同じ店舗の更新」だと判定できるようにするため
+    const store = decodeImportedStoreMap(exported)
+    expect(store?.id).toBe('store_original')
+  })
+
+  it('id が無ければ新しく振る', () => {
+    const { id: _id, ...withoutId } = exported.store
+    const store = decodeImportedStoreMap({ store: withoutId })
+    expect(store?.id).toBeTruthy()
+    expect(store?.id).not.toBe('store_original')
+  })
+
+  it('専用ジャンル (categories) があれば一緒に取り込む', () => {
+    const dedicated = [{ id: 'dedicated-1', name: '地域限定コーナー', color: '#123456', keywords: [] }]
+    const store = decodeImportedStoreMap({ store: { ...exported.store, categories: dedicated } })
+    expect(store?.categories).toEqual(dedicated)
+  })
+
+  it('専用ジャンルが無ければ undefined のまま', () => {
+    const store = decodeImportedStoreMap(exported)
+    expect(store?.categories).toBeUndefined()
+  })
+
+  it('形式が合わなければ null を返す', () => {
+    expect(decodeImportedStoreMap({ foo: 'bar' })).toBeNull()
+    expect(decodeImportedStoreMap(null)).toBeNull()
+    expect(decodeImportedStoreMap('not an object')).toBeNull()
   })
 })

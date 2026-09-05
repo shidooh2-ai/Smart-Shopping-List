@@ -1,4 +1,5 @@
-import type { Cell, Floor, MapNode, Shelf } from '../types'
+import { newId } from './id'
+import type { Category, Cell, Floor, MapNode, Shelf, StoreMap } from '../types'
 
 /** [コード, 連続数]。コード: '.'=通路 '#'=壁 's<n>'=shelves配列のn番目 'n<n>'=nodes配列のn番目 */
 export type CellRun = [string, number]
@@ -63,4 +64,35 @@ export function decodeFloorCells(compact: CompactFloor, shelves: Shelf[], nodes:
   }
   const { runs: _runs, ...rest } = compact
   return { ...rest, cells }
+}
+
+/**
+ * 配布用に書き出されたマップのJSON (マップ単体でも、封筒形式 `{ store: {...} }` でも、
+ * 全体バックアップの stores[] の要素でも) を StoreMap に変換する。形式が合わなければ null。
+ *
+ * id はJSON内のものをそのまま使う (新しく振り直さない)。これにより、以前取り込んだ
+ * 店舗と同じ id のマップを読み込んだときに「同じ店舗の更新」だと判定できる
+ * (呼び出し側で id が既存と重複していないか確認し、統合するかどうかを決める)。
+ */
+export function decodeImportedStoreMap(data: unknown): StoreMap | null {
+  if (!data || typeof data !== 'object') return null
+  // 書き出し機能が付けた封筒 ({ store: {...} }) でも、StoreMap そのものでも受け付ける
+  const envelope = data as { store?: unknown }
+  const raw = (envelope.store && typeof envelope.store === 'object' ? envelope.store : data) as Partial<StoreMap>
+  if (!Array.isArray(raw.floors) || !Array.isArray(raw.shelves) || !Array.isArray(raw.nodes)) return null
+  const shelves = raw.shelves as Shelf[]
+  const nodes = raw.nodes as MapNode[]
+  const floors = raw.floors as unknown as CompactFloor[]
+  const now = Date.now()
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : newId('store'),
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : '読み込んだ店舗',
+    floors: floors.map((f) => decodeFloorCells(f, shelves, nodes)),
+    shelves,
+    nodes,
+    cellMeters: typeof raw.cellMeters === 'number' ? raw.cellMeters : 1.2,
+    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : now,
+    updatedAt: now,
+    categories: Array.isArray(raw.categories) ? (raw.categories as Category[]) : undefined,
+  }
 }

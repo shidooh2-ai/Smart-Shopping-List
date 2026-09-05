@@ -12,7 +12,6 @@ import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
 import { appendActivity, newActivitySince, summarizeItemTexts } from '../lib/listActivity'
 import { notifyListActivity } from '../lib/listActivityNotify'
-import { type CompactFloor, decodeFloorCells } from '../lib/mapCodec'
 import { splitItems } from '../lib/normalize'
 import type {
   Category,
@@ -133,11 +132,6 @@ export interface AppState {
   addStoreCategory: (storeId: string, name: string, color: string) => string
   updateStoreCategory: (storeId: string, categoryId: string, patch: Partial<Omit<Category, 'id'>>) => void
   deleteStoreCategory: (storeId: string, categoryId: string) => void
-  /**
-   * 配布された店舗マップのJSON (書き出し機能で作ったもの) を新しい店舗として取り込む。
-   * 形式が合わなければ null を返す。
-   */
-  importStoreMap: (data: unknown) => string | null
   addFloor: (storeId: string) => string
   updateFloor: (
     storeId: string,
@@ -699,31 +693,6 @@ export const useAppStore = create<AppState>()(
             items: l.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: null, manual: false } : i)),
           })),
         })),
-
-      importStoreMap: (data) => {
-        if (!data || typeof data !== 'object') return null
-        // 書き出し機能が付けた封筒 ({ store: {...} }) でも、StoreMap そのものでも受け付ける
-        const envelope = data as { store?: unknown }
-        const raw = (envelope.store && typeof envelope.store === 'object' ? envelope.store : data) as Partial<StoreMap>
-        if (!Array.isArray(raw.floors) || !Array.isArray(raw.shelves) || !Array.isArray(raw.nodes)) return null
-        const shelves = raw.shelves as Shelf[]
-        const nodes = raw.nodes as MapNode[]
-        const floors = raw.floors as unknown as CompactFloor[]
-        const now = Date.now()
-        const store: StoreMap = {
-          id: newId('store'),
-          name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : '読み込んだ店舗',
-          floors: floors.map((f) => decodeFloorCells(f, shelves, nodes)),
-          shelves,
-          nodes,
-          cellMeters: typeof raw.cellMeters === 'number' ? raw.cellMeters : 1.2,
-          createdAt: now,
-          updatedAt: now,
-          categories: Array.isArray(raw.categories) ? (raw.categories as Category[]) : undefined,
-        }
-        set((s) => ({ stores: [...s.stores, store] }))
-        return store.id
-      },
 
       deleteStore: (storeId) =>
         set((s) => ({

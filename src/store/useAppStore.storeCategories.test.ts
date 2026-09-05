@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { encodeFloorCells } from '../lib/mapCodec'
 import { useAppStore } from './useAppStore'
 
 /**
@@ -79,83 +78,5 @@ describe('useAppStore: 店舗専用ジャンル', () => {
     addItems(list.id, 'ぜったいまざらないひらがなのことば')
     const item = useAppStore.getState().lists[0].items.at(-1)!
     expect(item.categoryId).not.toBe(catId)
-  })
-})
-
-describe('useAppStore: マップの書き出し用インポート (importStoreMap)', () => {
-  const initial = useAppStore.getState()
-
-  beforeEach(() => {
-    useAppStore.setState(initial, true)
-  })
-
-  it('StoreMap そのものの形式を取り込める', () => {
-    const source = useAppStore.getState().stores[0]
-    const id = useAppStore.getState().importStoreMap({
-      name: 'コピーした店舗',
-      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
-      shelves: source.shelves,
-      nodes: source.nodes,
-      cellMeters: 1.5,
-    })
-    expect(id).not.toBeNull()
-    const imported = useAppStore.getState().stores.find((s) => s.id === id)!
-    expect(imported.name).toBe('コピーした店舗')
-    expect(imported.cellMeters).toBe(1.5)
-    // 元の店舗とはIDが別 (取り込みは常に新規の店舗として追加する)
-    expect(imported.id).not.toBe(source.id)
-  })
-
-  it('{ store: {...} } の封筒形式も取り込める', () => {
-    const source = useAppStore.getState().stores[0]
-    const id = useAppStore.getState().importStoreMap({
-      app: 'smart-shopping-list',
-      kind: 'store-map',
-      store: {
-        name: '封筒経由',
-        floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
-        shelves: source.shelves,
-        nodes: source.nodes,
-        cellMeters: 1,
-      },
-    })
-    const imported = useAppStore.getState().stores.find((s) => s.id === id)!
-    expect(imported.name).toBe('封筒経由')
-  })
-
-  it('専用ジャンルも一緒に取り込める', () => {
-    const source = useAppStore.getState().stores[0]
-    const dedicated = [{ id: 'dedicated-1', name: '地域限定コーナー', color: '#123456', keywords: [] }]
-    const id = useAppStore.getState().importStoreMap({
-      name: 'ジャンル付き',
-      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
-      shelves: source.shelves,
-      nodes: source.nodes,
-      cellMeters: 1,
-      categories: dedicated,
-    })
-    const imported = useAppStore.getState().stores.find((s) => s.id === id)!
-    expect(imported.categories).toEqual(dedicated)
-  })
-
-  it('専用ジャンルが無い書き出し (マップのみ) も取り込める', () => {
-    const source = useAppStore.getState().stores[0]
-    const id = useAppStore.getState().importStoreMap({
-      name: 'ジャンルなし',
-      floors: source.floors.map((f) => encodeFloorCells(f, source.shelves, source.nodes)),
-      shelves: source.shelves,
-      nodes: source.nodes,
-      cellMeters: 1,
-    })
-    const imported = useAppStore.getState().stores.find((s) => s.id === id)!
-    expect(imported.categories).toBeUndefined()
-  })
-
-  it('形式が合わなければ null を返し、何も追加しない', () => {
-    const before = useAppStore.getState().stores.length
-    expect(useAppStore.getState().importStoreMap({ foo: 'bar' })).toBeNull()
-    expect(useAppStore.getState().importStoreMap(null)).toBeNull()
-    expect(useAppStore.getState().importStoreMap('not an object')).toBeNull()
-    expect(useAppStore.getState().stores).toHaveLength(before)
   })
 })

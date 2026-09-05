@@ -1,12 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { ViewSwitch } from '../components/ViewSwitch'
 import { PALETTE } from '../data/palette'
-import { exportJsonFile } from '../lib/exportFile'
 import { buildIndex, detectCategory } from '../lib/genre'
-import { type CompactFloor, decodeFloorCells, encodeFloorCells } from '../lib/mapCodec'
 import { useAppStore } from '../store/useAppStore'
-import type { Category, MapNode, Shelf, StoreMap } from '../types'
+import type { Category } from '../types'
 
 const SETTINGS_VIEWS = [
   { id: 'settings' as const, label: '設定' },
@@ -17,19 +15,13 @@ const SETTINGS_VIEWS = [
 export function GenreScreen() {
   const categories = useAppStore((s) => s.categories)
   const aliases = useAppStore((s) => s.aliases)
-  const stores = useAppStore((s) => s.stores)
-  const lists = useAppStore((s) => s.lists)
-  const purchased = useAppStore((s) => s.purchased)
-  const nickname = useAppStore((s) => s.nickname)
-  const tripHistory = useAppStore((s) => s.tripHistory)
   const setSettingsView = useAppStore((s) => s.setSettingsView)
-  const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias, replaceAll } = useAppStore()
+  const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias } = useAppStore()
 
   const [editing, setEditing] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
   const [probe, setProbe] = useState('')
   const [aliasSheet, setAliasSheet] = useState(false)
-  const fileRef = useRef<HTMLInputElement | null>(null)
 
   const index = useMemo(() => buildIndex(categories), [categories])
   const probeResult = useMemo(
@@ -39,59 +31,6 @@ export function GenreScreen() {
 
   const target: Category | null = editing ? (categories.find((c) => c.id === editing) ?? null) : null
   const aliasEntries = Object.entries(aliases)
-
-  const exportData = () => {
-    // マスの並びは棚・通路の繰り返しばかりで書き出しJSONの大半を占めるため、
-    // 店舗ごとにランレングス圧縮した形 (mapCodec.ts) に変換してから書き出す。
-    const compactStores = stores.map((s) => ({
-      ...s,
-      floors: s.floors.map((f) => encodeFloorCells(f, s.shelves, s.nodes)),
-    }))
-    const payload = JSON.stringify({
-      app: 'smart-shopping-list',
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      stores: compactStores,
-      lists,
-      categories,
-      aliases,
-      purchased,
-      nickname,
-      tripHistory,
-    })
-    void exportJsonFile(`shopping-route-${new Date().toISOString().slice(0, 10)}.json`, payload)
-  }
-
-  const importData = async (file: File) => {
-    try {
-      const data = JSON.parse(await file.text())
-      if (!data || typeof data !== 'object') throw new Error('形式が違います')
-      const rawStores = Array.isArray(data.stores) ? (data.stores as Array<Partial<StoreMap>>) : undefined
-      const importedStores = rawStores?.map((s): StoreMap => {
-        const shelves = (s.shelves ?? []) as Shelf[]
-        const nodes = (s.nodes ?? []) as MapNode[]
-        const floors = (s.floors ?? []) as unknown as CompactFloor[]
-        return {
-          ...s,
-          shelves,
-          nodes,
-          floors: floors.map((f) => decodeFloorCells(f, shelves, nodes)),
-        } as StoreMap
-      })
-      replaceAll({
-        stores: importedStores,
-        lists: Array.isArray(data.lists) ? data.lists : undefined,
-        categories: Array.isArray(data.categories) ? data.categories : undefined,
-        aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : undefined,
-        purchased: Array.isArray(data.purchased) ? data.purchased : undefined,
-        nickname: typeof data.nickname === 'string' ? data.nickname : undefined,
-        tripHistory: Array.isArray(data.tripHistory) ? data.tripHistory : undefined,
-      })
-      window.alert('読み込みました。')
-    } catch (e) {
-      window.alert(`読み込めませんでした: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
 
   return (
     <div className="screen">
@@ -173,38 +112,19 @@ export function GenreScreen() {
       <div className="card">
         <h2>データ</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          リスト・マップ・ジャンルはこの端末の中だけに保存されます。機種変更の前にバックアップしてください。
+          全体のバックアップの書き出し・読み込みは「設定」タブから行えます。
         </p>
-        <div className="row wrap">
-          <button type="button" className="btn slim" onClick={exportData}>
-            書き出す（JSON）
-          </button>
-          <button type="button" className="btn slim" onClick={() => fileRef.current?.click()}>
-            読み込む
-          </button>
-          <button
-            type="button"
-            className="btn slim danger"
-            onClick={() => {
-              if (window.confirm('ジャンルを初期状態に戻します。追加・編集した語彙は失われます。よろしいですか？')) {
-                resetCategories()
-              }
-            }}
-          >
-            ジャンルを初期化
-          </button>
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void importData(f)
-            e.target.value = ''
+        <button
+          type="button"
+          className="btn slim danger"
+          onClick={() => {
+            if (window.confirm('ジャンルを初期状態に戻します。追加・編集した語彙は失われます。よろしいですか？')) {
+              resetCategories()
+            }
           }}
-        />
+        >
+          ジャンルを初期化
+        </button>
       </div>
 
       <Sheet open={target != null} title="ジャンルの編集" onClose={() => setEditing(null)}>
