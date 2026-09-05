@@ -20,7 +20,6 @@ export function PetalArt({ color, size }: ArtProps) {
       />
       {/* 中心側の陰。のっぺりしないよう、根元だけ少し濃くする */}
       <path d="M12 23.2c-3.3-2-5.6-4.6-6.6-7.5 2.4 2.6 4.6 4.4 6.6 5.4z" fill="#000" opacity="0.08" />
-      <path d="M12 7.4c.7 3.6.7 8.6 0 14.4" stroke="#fff" strokeWidth="0.8" opacity="0.45" fill="none" />
     </svg>
   )
 }

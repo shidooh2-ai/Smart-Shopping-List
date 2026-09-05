@@ -66,8 +66,8 @@ function EffectScene({ burst }: { burst: Burst }) {
 
   return (
     <>
-      {burst.effectId === 'petals' && <FallingScene kind="petal" count={count} burst={burst} />}
-      {burst.effectId === 'confetti' && <FallingScene kind="confetti" count={count} burst={burst} />}
+      {burst.effectId === 'petals' && <PetalScene count={count} burst={burst} />}
+      {burst.effectId === 'confetti' && <FallingScene count={count} burst={burst} />}
       {burst.effectId === 'balloons' && <BalloonScene count={count} burst={burst} />}
       {burst.effectId === 'fireworks' && <FireworkScene count={count} burst={burst} isComplete={isComplete} />}
       {burst.effectId === 'squirrel' && <SquirrelScene count={count} burst={burst} isComplete={isComplete} />}
@@ -89,15 +89,15 @@ interface Falling {
   swayDuration: number
 }
 
-/** 上から落ちてくる系 (花びら・紙吹雪)。落下と横ゆれを入れ子にして自然な軌跡にする。 */
-function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; count: number; burst: Burst }) {
+/** 上から落ちてくる紙吹雪。落下と横ゆれを入れ子にして自然な軌跡にする。 */
+function FallingScene({ count, burst }: { count: number; burst: Burst }) {
   const colors = effectStyle(burst.effectId).colors
   const [pieces] = useState<Falling[]>(() =>
     Array.from({ length: count }, (_, i) => ({
       id: i,
       color: pick(colors, i),
       left: rand(0, 100),
-      size: kind === 'petal' ? rand(12, 22) : rand(8, 14),
+      size: rand(8, 14),
       delay: rand(0, 700),
       duration: rand(1600, 2600),
       drift: rand(-60, 60),
@@ -131,11 +131,79 @@ function FallingScene({ kind, count, burst }: { kind: 'petal' | 'confetti'; coun
               } as CSSProperties
             }
           >
-            {kind === 'petal' ? (
-              <PetalArt color={p.color} size={p.size} />
-            ) : (
-              <ConfettiArt color={p.color} size={p.size} />
-            )}
+            <ConfettiArt color={p.color} size={p.size} />
+          </span>
+        </span>
+      ))}
+    </>
+  )
+}
+
+interface Petal {
+  id: number
+  color: string
+  left: number
+  size: number
+  delay: number
+  duration: number
+  /** 落ちながら左右に振れる位置 (20/40/60/80/100%地点)。符号を交互にしてジグザグにする */
+  d1: number
+  d2: number
+  d3: number
+  d4: number
+  d5: number
+  spinDuration: number
+}
+
+/**
+ * 桜の花びら。左右に大きくジグザグしながら落ち、内側では花びら自身が
+ * くるくると裏表を見せるように回転する (葉っぱが「ひらひら」舞う動き)。
+ */
+function PetalScene({ count, burst }: { count: number; burst: Burst }) {
+  const colors = effectStyle(burst.effectId).colors
+  const [petals] = useState<Petal[]>(() =>
+    Array.from({ length: count }, (_, i) => {
+      const amp = rand(30, 60)
+      const dir = i % 2 === 0 ? 1 : -1
+      return {
+        id: i,
+        color: pick(colors, i),
+        left: rand(0, 100),
+        size: rand(14, 24),
+        delay: rand(0, 800),
+        duration: rand(2800, 4400),
+        d1: dir * amp * rand(0.6, 1),
+        d2: -dir * amp * rand(0.8, 1.2),
+        d3: dir * amp * rand(0.7, 1.1),
+        d4: -dir * amp * rand(0.5, 0.9),
+        d5: dir * amp * rand(0.15, 0.4),
+        spinDuration: rand(500, 950),
+      }
+    }),
+  )
+
+  return (
+    <>
+      {petals.map((p) => (
+        <span
+          key={p.id}
+          className="effect-petal-fall"
+          style={
+            {
+              left: `${p.left}%`,
+              '--fall': `${burst.screenHeight + 80}px`,
+              '--d1': `${p.d1}px`,
+              '--d2': `${p.d2}px`,
+              '--d3': `${p.d3}px`,
+              '--d4': `${p.d4}px`,
+              '--d5': `${p.d5}px`,
+              animationDelay: `${p.delay}ms`,
+              animationDuration: `${p.duration}ms`,
+            } as CSSProperties
+          }
+        >
+          <span className="effect-petal-spin" style={{ animationDuration: `${p.spinDuration}ms` } as CSSProperties}>
+            <PetalArt color={p.color} size={p.size} />
           </span>
         </span>
       ))}

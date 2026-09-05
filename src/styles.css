@@ -1255,7 +1255,7 @@ label.field > span {
   overflow: hidden;
 }
 
-/* --- 上から落ちてくる (花びら・紙吹雪) --- */
+/* --- 上から落ちてくる (紙吹雪) --- */
 .effect-fall {
   position: absolute;
   top: -60px;
@@ -1298,6 +1298,65 @@ label.field > span {
   }
   to {
     transform: translateX(10px) rotate(var(--spin));
+  }
+}
+
+/* --- 桜の花びら (左右に大きくジグザグしながら「ひらひら」落ちる) --- */
+.effect-petal-fall {
+  position: absolute;
+  top: -60px;
+  display: block;
+  animation-name: effect-petal-fall;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+/* 20%刻みで左右の位置 (--d1〜--d5) を指定し、符号を交互にしてジグザグの軌跡を作る */
+@keyframes effect-petal-fall {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  20% {
+    transform: translate3d(var(--d1), calc(var(--fall) * 0.2), 0);
+  }
+  40% {
+    transform: translate3d(var(--d2), calc(var(--fall) * 0.4), 0);
+  }
+  60% {
+    transform: translate3d(var(--d3), calc(var(--fall) * 0.6), 0);
+  }
+  80% {
+    transform: translate3d(var(--d4), calc(var(--fall) * 0.8), 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--d5), var(--fall), 0);
+    opacity: 0;
+  }
+}
+
+/* 花びら自身がくるっと裏返るような、その場での回転 (scaleXで薄く見せて葉が翻る感じを出す) */
+.effect-petal-spin {
+  display: block;
+  animation-name: effect-petal-spin;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes effect-petal-spin {
+  0% {
+    transform: rotate(-18deg) scaleX(1);
+  }
+  50% {
+    transform: rotate(10deg) scaleX(0.45);
+  }
+  100% {
+    transform: rotate(-18deg) scaleX(1);
   }
 }
 
