@@ -57,3 +57,26 @@ export function describeActivityEvent(event: ListActivityEvent): string {
 export function notifiableEvents(list: Pick<ShoppingList, 'notifications'>, events: ListActivityEvent[]): ListActivityEvent[] {
   return events.filter((e) => isNotificationEnabled(list.notifications, e.kind))
 }
+
+export interface Contribution {
+  /** ニックネーム未設定の操作は「誰か」としてまとめる */
+  by: string
+  count: number
+}
+
+/**
+ * 共有リストで「誰が何回購入操作をしたか」を集計する (ゲーム性の要素・貢献の可視化に使う)。
+ * 変更履歴 (activity) は件数に上限があるので、あくまで直近の目安。件数の多い順に返す。
+ */
+export function purchaseContributions(
+  activity: ListActivityEvent[] | undefined,
+  sinceMs: number,
+): Contribution[] {
+  const counts = new Map<string, number>()
+  for (const e of activity ?? []) {
+    if (e.kind !== 'purchase' || e.at < sinceMs) continue
+    const label = e.by ?? '誰か'
+    counts.set(label, (counts.get(label) ?? 0) + 1)
+  }
+  return [...counts.entries()].map(([by, count]) => ({ by, count })).sort((a, b) => b.count - a.count)
+}

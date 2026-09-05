@@ -6,6 +6,7 @@ import {
   isNotificationEnabled,
   newActivitySince,
   notifiableEvents,
+  purchaseContributions,
   summarizeItemTexts,
 } from './listActivity'
 
@@ -101,5 +102,48 @@ describe('describeActivityEvent', () => {
 
   it('操作した人が分からなければ「誰かが」にする', () => {
     expect(describeActivityEvent({ ...event('a'), by: null })).toBe('誰かが「牛乳」を追加しました')
+  })
+})
+
+describe('purchaseContributions', () => {
+  const purchaseEvent = (by: string | null, at = 1000): ListActivityEvent => ({
+    ...event('p', 'purchase'),
+    by,
+    at,
+  })
+
+  it('purchase以外のイベントは数えない', () => {
+    const activity = [event('a', 'add'), event('b', 'remove'), purchaseEvent('たろう')]
+    expect(purchaseContributions(activity, 0)).toEqual([{ by: 'たろう', count: 1 }])
+  })
+
+  it('人ごとに件数を集計し、多い順に返す', () => {
+    const activity = [
+      { ...purchaseEvent('たろう'), id: '1' },
+      { ...purchaseEvent('はなこ'), id: '2' },
+      { ...purchaseEvent('たろう'), id: '3' },
+      { ...purchaseEvent('たろう'), id: '4' },
+    ]
+    expect(purchaseContributions(activity, 0)).toEqual([
+      { by: 'たろう', count: 3 },
+      { by: 'はなこ', count: 1 },
+    ])
+  })
+
+  it('ニックネーム未設定 (by: null) は「誰か」としてまとめる', () => {
+    const activity = [{ ...purchaseEvent(null), id: '1' }]
+    expect(purchaseContributions(activity, 0)).toEqual([{ by: '誰か', count: 1 }])
+  })
+
+  it('指定した時刻より前のイベントは含めない', () => {
+    const activity = [
+      { ...purchaseEvent('たろう', 500), id: '1' },
+      { ...purchaseEvent('たろう', 1500), id: '2' },
+    ]
+    expect(purchaseContributions(activity, 1000)).toEqual([{ by: 'たろう', count: 1 }])
+  })
+
+  it('履歴が無ければ空配列', () => {
+    expect(purchaseContributions(undefined, 0)).toEqual([])
   })
 })

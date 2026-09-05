@@ -4,7 +4,9 @@ import { CloudSync, type CloudSyncItem } from '../lib/cloudSync'
 import { cloneDefaultCategories } from '../data/categories'
 import { PALETTE } from '../data/palette'
 import { createSampleStore } from '../data/sampleStore'
+import type { EffectId } from '../data/effects'
 import type { ThemeId } from '../data/themes'
+import { fireEffect } from '../lib/effectBus'
 import { aliasKey, buildIndex, detectCategory } from '../lib/genre'
 import { idx, makeCells, pruneOrphans } from '../lib/grid'
 import { newId } from '../lib/id'
@@ -27,7 +29,11 @@ import type {
   ShoppingItem,
   ShoppingList,
   StoreMap,
+  TripRecord,
 } from '../types'
+
+/** tripHistory に保持する記録の上限。増えすぎないよう古いものから切り詰める。 */
+const TRIP_HISTORY_LIMIT = 200
 
 /** 下段タブバーの3つの画面 */
 export type Tab = 'list' | 'route' | 'settings'
@@ -63,6 +69,10 @@ export interface AppState {
   screenWakeLockEnabled: boolean
   /** 画面の配色。'default' は端末のライト/ダーク設定に従う */
   theme: ThemeId
+  /** チェック・買い物完了時のお祝いエフェクト。テーマと同じく着せ替えできる */
+  effectTheme: EffectId
+  /** 「何日連続」「前回より何分速い」などの元になる、完了したお買い物の記録 */
+  tripHistory: TripRecord[]
   /** storeId ごとの「元に戻す」用スナップショット (直近の操作が末尾)。保存はしない */
   mapHistory: Record<string, StoreMap[]>
   /** storeId ごとの「やり直す」用スナップショット (元に戻す操作で積む)。保存はしない */
@@ -74,6 +84,7 @@ export interface AppState {
   setNickname: (nickname: string) => void
   setScreenWakeLockEnabled: (enabled: boolean) => void
   setTheme: (theme: ThemeId) => void
+  setEffectTheme: (effect: EffectId) => void
 
   // --- 買い物リスト ---
   createList: (name?: string, color?: string) => string
@@ -94,8 +105,12 @@ export interface AppState {
   clearChecked: (listId: string) => void
   uncheckAll: (listId: string) => void
   redetectCategories: (listId: string) => void
-  /** チェック済みの品目を購入済みリストへ移す (対象リストからは削除される) */
-  markPurchased: (listId: string, itemIds: string[]) => void
+  /**
+   * チェック済みの品目を購入済みリストへ移す (対象リストからは削除される)。
+   * distanceMeters を渡すと、そのお買い物の記録 (tripHistory) に歩いた距離として残る
+   * (ルート画面経由のときだけ分かる)
+   */
+  markPurchased: (listId: string, itemIds: string[], meta?: { distanceMeters?: number }) => void
   /** 購入済み品目の日付を編集する */
   updatePurchasedDate: (purchasedId: string, purchasedAt: number) => void
   deletePurchasedItem: (purchasedId: string) => void
@@ -149,7 +164,9 @@ export interface AppState {
   cleanupMap: (storeId: string) => void
 
   replaceAll: (
-    data: Partial<Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases' | 'purchased' | 'nickname'>>,
+    data: Partial<
+      Pick<AppState, 'stores' | 'lists' | 'categories' | 'aliases' | 'purchased' | 'nickname' | 'tripHistory'>
+    >,
   ) => void
 
   // --- iCloud共有 (iPhoneアプリのみ) ---
@@ -199,6 +216,8 @@ function initialState() {
     nickname: '',
     screenWakeLockEnabled: false,
     theme: 'default' as ThemeId,
+    effectTheme: 'default' as EffectId,
+    tripHistory: [] as TripRecord[],
     mapHistory: {} as Record<string, StoreMap[]>,
     mapRedo: {} as Record<string, StoreMap[]>,
   }
@@ -215,6 +234,29 @@ function mapList(
 
 function mapStore(stores: StoreMap[], storeId: string, fn: (s: StoreMap) => StoreMap): StoreMap[] {
   return stores.map((s) => (s.id === storeId ? { ...fn(s), updatedAt: Date.now() } : s))
+}
+
+/**
+ * 品目のチェック状態を変える共通処理。checked を付けたときは checkedAt を記録し、
+ * お祝いエフェクトを発火する (リストが全部チェック済みになったときは check ではなく complete)。
+ * 呼び出し側 (toggleItem/setItemChecked) は「実際に値が変わるときだけ」呼ぶこと。
+ */
+function applyItemChecked(
+  lists: ShoppingList[],
+  listId: string,
+  itemId: string,
+  checked: boolean,
+): { lists: ShoppingList[] } {
+  const updated = mapList(lists, listId, (l) => ({
+    ...l,
+    items: l.items.map((i) => (i.id === itemId ? { ...i, checked, checkedAt: checked ? Date.now() : undefined } : i)),
+  }))
+  if (checked) {
+    const list = updated.find((l) => l.id === listId)
+    const allDone = !!list && list.items.length > 0 && list.items.every((i) => i.checked)
+    fireEffect(allDone ? 'complete' : 'check')
+  }
+  return { lists: updated }
 }
 
 /**
@@ -308,6 +350,7 @@ export const useAppStore = create<AppState>()(
       setNickname: (nickname) => set({ nickname }),
       setScreenWakeLockEnabled: (screenWakeLockEnabled) => set({ screenWakeLockEnabled }),
       setTheme: (theme) => set({ theme }),
+      setEffectTheme: (effectTheme) => set({ effectTheme }),
 
       // --- 買い物リスト ---
       createList: (name, color) => {
@@ -371,20 +414,20 @@ export const useAppStore = create<AppState>()(
         }),
 
       toggleItem: (listId, itemId) =>
-        set((s) => ({
-          lists: mapList(s.lists, listId, (l) => ({
-            ...l,
-            items: l.items.map((i) => (i.id === itemId ? { ...i, checked: !i.checked } : i)),
-          })),
-        })),
+        set((s) => {
+          const list = s.lists.find((l) => l.id === listId)
+          const target = list?.items.find((i) => i.id === itemId)
+          if (!target) return {}
+          return applyItemChecked(s.lists, listId, itemId, !target.checked)
+        }),
 
       setItemChecked: (listId, itemId, checked) =>
-        set((s) => ({
-          lists: mapList(s.lists, listId, (l) => ({
-            ...l,
-            items: l.items.map((i) => (i.id === itemId ? { ...i, checked } : i)),
-          })),
-        })),
+        set((s) => {
+          const list = s.lists.find((l) => l.id === listId)
+          const target = list?.items.find((i) => i.id === itemId)
+          if (!target || target.checked === checked) return {}
+          return applyItemChecked(s.lists, listId, itemId, checked)
+        }),
 
       removeItem: (listId, itemId) =>
         set((s) => {
@@ -485,7 +528,7 @@ export const useAppStore = create<AppState>()(
           }
         }),
 
-      markPurchased: (listId, itemIds) =>
+      markPurchased: (listId, itemIds, meta) =>
         set((s) => {
           const list = s.lists.find((l) => l.id === listId)
           if (!list) return {}
@@ -493,6 +536,7 @@ export const useAppStore = create<AppState>()(
           const moving = list.items.filter((i) => idSet.has(i.id))
           if (moving.length === 0) return {}
           const now = Date.now()
+          const by = s.nickname.trim() || null
           const newlyPurchased: PurchasedItem[] = moving.map((i) => ({
             id: newId('purchased'),
             text: i.text,
@@ -501,17 +545,30 @@ export const useAppStore = create<AppState>()(
             listName: list.name,
             addedBy: i.addedBy ?? null,
           }))
+          // 最初にチェックした品目の時刻を「お買い物を始めた時刻」とみなして所要時間を出す
+          const checkedAts = moving.map((i) => i.checkedAt).filter((t): t is number => t != null)
+          const durationMs = checkedAts.length > 0 ? now - Math.min(...checkedAts) : null
+          const trip: TripRecord = {
+            id: newId('trip'),
+            listId,
+            listName: list.name,
+            completedAt: now,
+            durationMs,
+            distanceMeters: meta?.distanceMeters ?? null,
+            itemCount: moving.length,
+            by,
+          }
+          const tripHistory = [...s.tripHistory, trip]
           return {
             purchased: [...s.purchased, ...newlyPurchased],
+            tripHistory:
+              tripHistory.length > TRIP_HISTORY_LIMIT
+                ? tripHistory.slice(tripHistory.length - TRIP_HISTORY_LIMIT)
+                : tripHistory,
             lists: mapList(s.lists, listId, (l) => ({
               ...l,
               items: l.items.filter((i) => !idSet.has(i.id)),
-              activity: appendActivity(
-                l.activity,
-                'purchase',
-                summarizeItemTexts(moving.map((i) => i.text)),
-                s.nickname.trim() || null,
-              ),
+              activity: appendActivity(l.activity, 'purchase', summarizeItemTexts(moving.map((i) => i.text)), by),
             })),
           }
         }),
@@ -839,6 +896,7 @@ export const useAppStore = create<AppState>()(
             aliases: data.aliases ?? s.aliases,
             purchased: data.purchased ?? s.purchased,
             nickname: data.nickname ?? s.nickname,
+            tripHistory: data.tripHistory ?? s.tripHistory,
             activeListId: lists.some((l) => l.id === s.activeListId) ? s.activeListId : (lists[0]?.id ?? null),
           }
         }),
@@ -962,6 +1020,8 @@ export const useAppStore = create<AppState>()(
         nickname,
         screenWakeLockEnabled,
         theme,
+        effectTheme,
+        tripHistory,
       }) => ({
         stores,
         lists,
@@ -973,6 +1033,8 @@ export const useAppStore = create<AppState>()(
         nickname,
         screenWakeLockEnabled,
         theme,
+        effectTheme,
+        tripHistory,
       }),
     },
   ),

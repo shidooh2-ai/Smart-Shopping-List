@@ -186,6 +186,44 @@ describe('planRoute', () => {
     expect(plan.stops).toHaveLength(1)
   })
 
+  describe("strategy: 'sequential' (書いた順のまま回る、効率比較のベースライン)", () => {
+    const lineMap = () =>
+      buildStoreFromAscii('t', [
+        {
+          name: '1F', level: 1,
+          rows: ['###########', '#E.......C#', '#.a.b.c...#', '###########'],
+          shelves: {
+            a: { name: 'A', categoryIds: ['ca'] },
+            b: { name: 'B', categoryIds: ['cb'] },
+            c: { name: 'C', categoryIds: ['cc'] },
+          },
+          nodes: { E: { kind: 'entrance', name: '入口' }, C: { kind: 'checkout', name: 'レジ' } },
+        },
+      ])
+
+    it("既定 ('optimal') は書いた順が逆でも最短順に並べ替える", () => {
+      const map = lineMap()
+      const items = [item('先に書いた (遠い方)', 'cc'), item('後で書いた (近い方)', 'ca')]
+      const plan = planRoute(map, items)
+      expect(plan.stops.map((s) => s.shelfNames[0])).toEqual(['A', 'C'])
+    })
+
+    it("'sequential' は書いた順 (ジャンルが最初に出てきた順) のまま回る", () => {
+      const map = lineMap()
+      const items = [item('先に書いた (遠い方)', 'cc'), item('後で書いた (近い方)', 'ca')]
+      const plan = planRoute(map, items, 'balanced', 'sequential')
+      expect(plan.stops.map((s) => s.shelfNames[0])).toEqual(['C', 'A'])
+    })
+
+    it('並べ替えた方 (optimal) の総距離は、書いた順のまま (sequential) より短い', () => {
+      const map = lineMap()
+      const items = [item('先に書いた (遠い方)', 'cc'), item('後で書いた (近い方)', 'ca')]
+      const optimal = planRoute(map, items)
+      const sequential = planRoute(map, items, 'balanced', 'sequential')
+      expect(optimal.totalDistance).toBeLessThan(sequential.totalDistance)
+    })
+  })
+
   it('入口から始まりレジで終わる', () => {
     const map = createSampleStore()
     const plan = planRoute(map, [item('牛乳', 'dairy'), item('パン', 'bread')])

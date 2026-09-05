@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { EffectLayer } from './components/EffectLayer'
 import { ListGlyph, RouteGlyph, SettingsGlyph } from './components/icons'
 import { startCloudSyncBridge } from './lib/cloudSyncBridge'
 import { startReminderBridge } from './lib/reminderBridge'
@@ -67,6 +68,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <EffectLayer />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ViewSwitch } from '../components/ViewSwitch'
+import { EFFECTS } from '../data/effects'
 import { THEMES } from '../data/themes'
+import { fireEffect } from '../lib/effectBus'
 import { isWakeLockSupported } from '../lib/wakeLock'
 import { useAppStore } from '../store/useAppStore'
 
@@ -18,6 +20,8 @@ export function SettingsScreen() {
   const setSettingsView = useAppStore((s) => s.setSettingsView)
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
+  const effectTheme = useAppStore((s) => s.effectTheme)
+  const setEffectTheme = useAppStore((s) => s.setEffectTheme)
   const [name, setName] = useState(nickname)
   const wakeLockSupported = isWakeLockSupported()
 
@@ -60,6 +64,36 @@ export function SettingsScreen() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="card">
+        <h2>エフェクト</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          品目をチェックしたときや、リストを買い終えたときの演出です。テーマと同じように着せ替えできます。
+        </p>
+        <div className="theme-grid">
+          {EFFECTS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              aria-pressed={effectTheme === e.id}
+              onClick={() => setEffectTheme(e.id)}
+            >
+              <span className="effect-preview">
+                {e.completeEmoji.length > 0 ? e.completeEmoji.join(' ') : '🚫'}
+              </span>
+              {e.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn slim"
+          style={{ marginTop: 10 }}
+          onClick={() => fireEffect('complete')}
+        >
+          試す
+        </button>
       </div>
 
       <div className="card">

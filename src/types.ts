@@ -75,6 +75,8 @@ export interface ShoppingItem {
   createdAt: number
   /** この品目を追加したユーザーのニックネーム (未設定なら null) */
   addedBy?: string | null
+  /** チェックを付けた日時。買い物の所要時間 (TripRecord) の算出に使う。チェックを外すと消える */
+  checkedAt?: number
 }
 
 /** リマインダーの繰り返し方。'once' は指定日時に1回だけ */
@@ -134,6 +136,25 @@ export interface ShoppingList {
   activity?: ListActivityEvent[]
   /** このリストの通知設定 (端末ローカル。CloudKitへは同期しない) */
   notifications?: ListNotificationPrefs
+}
+
+/**
+ * 1回のお買い物 (チェックを付け始めてからレジ・購入済みへ移すまで) の記録。
+ * 「◯日連続」「前回より◯分速い」といった、続けたくなる仕掛け (ゲーム性) の元データ。
+ * 端末ローカルの統計情報で、CloudKitへは同期しない。
+ */
+export interface TripRecord {
+  id: string
+  listId: string
+  /** リストが削除・改名されても表示に残せるようにスナップショットしておく */
+  listName: string
+  completedAt: number
+  /** 最初にチェックしてから購入済みにするまでの所要時間。分からなければ null */
+  durationMs: number | null
+  /** 実際に歩いた距離 (m)。ルート画面経由でなければ null */
+  distanceMeters: number | null
+  itemCount: number
+  by: string | null
 }
 
 export interface PurchasedItem {

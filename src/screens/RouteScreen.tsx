@@ -39,6 +39,15 @@ export function RouteScreen() {
     () => (store && list ? planRoute(store, list.items, routePreference) : null),
     [store, list, routePreference],
   )
+  // 「書いた順のまま回ったら」との比較用。ルート最適化の効果を数字で見せる。
+  const naivePlan = useMemo(
+    () => (store && list ? planRoute(store, list.items, routePreference, 'sequential') : null),
+    [store, list, routePreference],
+  )
+  const efficiencyPct =
+    plan && naivePlan && naivePlan.totalDistance > 0
+      ? Math.round((1 - plan.totalDistance / naivePlan.totalDistance) * 100)
+      : 0
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const itemById = useMemo(() => new Map((list?.items ?? []).map((i) => [i.id, i])), [list])
@@ -93,7 +102,7 @@ export function RouteScreen() {
   const checkoutToPurchased = () => {
     if (checkedItemIds.length === 0) return
     if (window.confirm(`チェックした ${checkedItemIds.length} 件を購入済みにします。よろしいですか？`)) {
-      markPurchased(list.id, checkedItemIds)
+      markPurchased(list.id, checkedItemIds, { distanceMeters: metrics?.meters })
     }
   }
 
@@ -203,6 +212,11 @@ export function RouteScreen() {
           {metrics.floorChanges > 0 && (
             <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
               階の移動が {metrics.floorChanges} 回あります。
+            </p>
+          )}
+          {efficiencyPct > 0 && (
+            <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
+              🚶 このルートなら、リストに書いた順のまま回るより約 {efficiencyPct}% 短い距離で買い物できます。
             </p>
           )}
         </div>

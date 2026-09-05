@@ -19,6 +19,7 @@ export function GenreScreen() {
   const lists = useAppStore((s) => s.lists)
   const purchased = useAppStore((s) => s.purchased)
   const nickname = useAppStore((s) => s.nickname)
+  const tripHistory = useAppStore((s) => s.tripHistory)
   const setSettingsView = useAppStore((s) => s.setSettingsView)
   const { addCategory, updateCategory, deleteCategory, resetCategories, forgetAlias, replaceAll } = useAppStore()
 
@@ -49,6 +50,7 @@ export function GenreScreen() {
         aliases,
         purchased,
         nickname,
+        tripHistory,
       },
       null,
       2,
@@ -72,6 +74,7 @@ export function GenreScreen() {
         aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : undefined,
         purchased: Array.isArray(data.purchased) ? data.purchased : undefined,
         nickname: typeof data.nickname === 'string' ? data.nickname : undefined,
+        tripHistory: Array.isArray(data.tripHistory) ? data.tripHistory : undefined,
       })
       window.alert('読み込みました。')
     } catch (e) {

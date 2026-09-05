@@ -4,9 +4,13 @@ import { CloudShareSection } from '../components/CloudShareSection'
 import { PurchasedSheet } from '../components/PurchasedSheet'
 import { Sheet } from '../components/Sheet'
 import { PALETTE } from '../data/palette'
+import { purchaseContributions } from '../lib/listActivity'
 import { WEEKDAY_LABELS, describeReminder, isReminderSupported } from '../lib/reminders'
+import { computeStreak, computeTimeTrend } from '../lib/tripStats'
 import { useActiveList, useAppStore } from '../store/useAppStore'
 import type { Category, CloudLink, ListNotificationPrefs, ListReminder, ReminderRepeat, ShoppingItem } from '../types'
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 const REPEAT_OPTIONS: Array<{ id: ReminderRepeat; label: string }> = [
   { id: 'once', label: '1回だけ' },
@@ -24,6 +28,7 @@ export function ListScreen() {
   const list = useActiveList()
   const categories = useAppStore((s) => s.categories)
   const lists = useAppStore((s) => s.lists)
+  const tripHistory = useAppStore((s) => s.tripHistory)
   const {
     addItems,
     toggleItem,
@@ -78,6 +83,12 @@ export function ListScreen() {
   const unresolved = list.items.filter((i) => !i.checked && !i.categoryId).length
   const checkedCount = list.items.length - remaining
 
+  // 続けたくなる仕掛け: 何日連続で買い物したか・前回より速いか・(共有中なら)誰が貢献したか
+  const streak = computeStreak(tripHistory)
+  const timeTrend = computeTimeTrend(tripHistory, list.id)
+  const contributions = list.cloud ? purchaseContributions(list.activity, Date.now() - WEEK_MS) : []
+  const showStats = streak > 0 || timeTrend !== null || contributions.length > 0
+
   const groups = useMemo(() => {
     if (!grouped) return [{ category: null as Category | null, items: list.items }]
     const out: Array<{ category: Category | null; items: ShoppingItem[] }> = []
@@ -108,6 +119,45 @@ export function ListScreen() {
           </button>
         </div>
       </div>
+
+      {showStats && (
+        <div className="card">
+          <div className="stats-row">
+            {streak > 0 && (
+              <span className="stat-pill">
+                <span className="emoji">🔥</span>
+                {streak}日連続
+              </span>
+            )}
+            {timeTrend && (
+              <span className="stat-pill">
+                <span className="emoji">⏱</span>
+                前回 {timeTrend.latestMinutes}分
+                {timeTrend.deltaMinutes > 0
+                  ? `（平均より${timeTrend.deltaMinutes}分速い）`
+                  : timeTrend.deltaMinutes < 0
+                    ? `（平均より${-timeTrend.deltaMinutes}分遅い）`
+                    : '（平均と同じくらい）'}
+              </span>
+            )}
+          </div>
+          {contributions.length > 0 && (
+            <>
+              <p className="muted" style={{ margin: '10px 0 0' }}>
+                今週の貢献
+              </p>
+              <ul className="contribution-list">
+                {contributions.map((c) => (
+                  <li key={c.by}>
+                    <span className="count">{c.count}回</span>
+                    {c.by === '誰か' ? c.by : `${c.by}さん`}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="additem">

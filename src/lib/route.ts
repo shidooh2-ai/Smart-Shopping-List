@@ -36,11 +36,15 @@ const emptyPlan = (): RoutePlan => ({
  * 2. ジャンルを取り扱う棚の「前に立てるマス」を候補地点にする
  * 3. 入口→各ジャンル(1棚選択)→レジ を最短で回る順序を解く
  *    (集合TSP。12ジャンル以下は厳密解、それ以上は最近傍法+2-opt)
+ *
+ * strategy が 'sequential' のときは並べ替えをせず、リストに書いた順 (ジャンルが最初に
+ * 出てきた順) のまま回る。最適ルートとの効率比較 (RouteScreenの「◯%短縮」表示) に使う。
  */
 export function planRoute(
   map: StoreMap,
   items: ShoppingItem[],
   preference: RoutePreference = 'balanced',
+  strategy: 'optimal' | 'sequential' = 'optimal',
 ): RoutePlan {
   const plan = emptyPlan()
   // ジャンル未設定の警告は「今から買う必要があるもの」だけを対象にする (チェック済みは対象外)。
@@ -149,7 +153,8 @@ export function planRoute(
   let goalSrc: number | null = null
   let bestCost = Infinity
   for (const gs of goalSrcs) {
-    const candidateOrder = solveGroupTsp(reachable, D, 0, gs)
+    const candidateOrder =
+      strategy === 'sequential' ? sequentialOrder(reachable, D, 0) : solveGroupTsp(reachable, D, 0, gs)
     if (candidateOrder.length === 0) continue
     const cost = tourCost(candidateOrder, gs)
     if (cost < bestCost) {
@@ -287,6 +292,30 @@ export function solveGroupTsp(
   const G = groups.length
   if (G === 0) return []
   return G <= EXACT_LIMIT ? solveExact(groups, D, start, goal) : solveHeuristic(groups, D, start, goal)
+}
+
+/**
+ * グループの並び替えをせず、渡された順 (＝リストに書いたジャンルの出現順) のまま回る。
+ * 各ジャンル内では、直前の地点から近い棚を選ぶ (棚選び自体は最適化してもよいので)。
+ * 「普通に書いた順で回るとどれだけ遠回りになるか」の比較用ベースライン。
+ */
+function sequentialOrder(groups: Group[], D: (a: number, b: number) => number, start: number): VisitChoice[] {
+  const seq: VisitChoice[] = []
+  let cur = start
+  groups.forEach((g, groupIndex) => {
+    let bestSrc = g.cands[0].src
+    let bestD = D(cur, bestSrc)
+    for (const c of g.cands) {
+      const d = D(cur, c.src)
+      if (d < bestD) {
+        bestD = d
+        bestSrc = c.src
+      }
+    }
+    seq.push({ groupIndex, src: bestSrc })
+    cur = bestSrc
+  })
+  return seq
 }
 
 function solveExact(

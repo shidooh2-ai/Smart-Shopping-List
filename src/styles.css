@@ -1170,3 +1170,144 @@ label.field > span {
   height: 10px;
   border-radius: 50%;
 }
+
+/* エフェクトの見本 (テーマと同じ theme-grid を流用し、中身だけ絵文字にする) */
+.effect-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 34px;
+  font-size: 18px;
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+/* ---------- チェック・お買い物完了のお祝いエフェクト ----------
+   タブバーなどに巻き込まれないよう body 直下にポータルで描画する。クリックを奪わないように
+   pointer-events は無効にしておく。 */
+.effect-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.effect-burst {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 0;
+  height: 0;
+}
+
+.effect-burst.complete {
+  top: 32%;
+}
+
+.effect-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: effect-fly 900ms ease-out forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes effect-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.05) rotate(var(--rot));
+  }
+}
+
+.effect-toast {
+  position: absolute;
+  left: 50%;
+  top: 60px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 700;
+  box-shadow: var(--shadow-card);
+  animation: effect-toast-pop 1.6s ease-out forwards;
+}
+
+@keyframes effect-toast-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  25% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px) scale(1);
+  }
+}
+
+/* ---------- お買い物の記録 (続けたくなる仕掛け: ストリーク・時短・貢献) ---------- */
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stat-pill .emoji {
+  font-size: 15px;
+}
+
+.contribution-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contribution-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.contribution-list .count {
+  color: var(--accent);
+  font-weight: 700;
+}
