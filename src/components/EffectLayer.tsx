@@ -350,7 +350,7 @@ function SquirrelScene({ count, burst, isComplete }: { count: number; burst: Bur
       <AcornLeafShower count={count} burst={burst} />
       <SquirrelSparkles burst={burst} />
       <span className="effect-mascot">
-        <SquirrelArt size={128} happy />
+        <SquirrelArt size={128} />
       </span>
     </>
   )
