@@ -98,112 +98,120 @@ export function RouteNav({
         </button>
       </header>
 
-      <div className="navmap">
-        {floor && (
-          <MapView
-            store={store}
-            floor={floor}
-            categories={categories}
-            plan={plan}
-            activeStop={step?.stopOrder ?? null}
-            doneStopOrders={doneStopOrders}
-            focusArea={step?.area ?? null}
-            fullBleed
-            showZoomBar={false}
-          />
-        )}
-      </div>
+      {/*
+        地図とパネルの高さの分け方は styles.css 側で固定 (.navpanel { flex: 0 0 45% }) にしている。
+        以前はパネルの高さが中身 (品目数・案内文・レジのボタンの有無) によって伸び縮みしていたため、
+        手順が変わるたびに地図の表示領域自体も伸び縮みしてしまい、地図のカメラが移動先へ動く演出と
+        重なって「一瞬だけ地図が広がって見える」不具合になっていた。
+      */}
+      <div className="navstage">
+        <div className="navmap">
+          {floor && (
+            <MapView
+              store={store}
+              floor={floor}
+              categories={categories}
+              plan={plan}
+              activeStop={step?.stopOrder ?? null}
+              doneStopOrders={doneStopOrders}
+              focusArea={step?.area ?? null}
+              fullBleed
+              showZoomBar={false}
+            />
+          )}
+        </div>
 
-      <div className="navpanel">
-        {!navigating ? (
-          <>
-            <p className="muted" style={{ margin: '0 0 10px' }}>
-              全体を表示しています。ナビを開始すると、地点ごとに拡大して案内します。
-            </p>
-            <button
-              type="button"
-              className="btn primary"
-              style={{ width: '100%' }}
-              onClick={() => setStepIndex(firstUnfinishedStep(steps, doneStopOrders))}
-              disabled={steps.length === 0}
-            >
-              ナビ開始
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="row" style={{ marginBottom: 8 }}>
-              <span className={`badge${step?.kind === 'relay' ? ' relay' : ''}`}>
-                {step?.kind === 'stop' ? step.stopOrder : step?.kind === 'relay' ? '⏩' : '⤷'}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="where">{heading}</div>
-                <span className="muted">
-                  {stepIndex + 1} / {steps.length}
-                </span>
-              </div>
-            </div>
-
-            {step?.kind === 'relay' && (
+        <div className="navpanel">
+          {!navigating ? (
+            <>
               <p className="muted" style={{ margin: '0 0 10px' }}>
-                この先で階が変わります。{step.label}向かってください。
+                全体を表示しています。ナビを開始すると、地点ごとに拡大して案内します。
               </p>
-            )}
-
-            {items.length > 0 && (
-              <ul className="goods nav-goods" style={{ marginBottom: 10 }}>
-                {items.map((item) => (
-                  <li
-                    key={item.id}
-                    className={item.checked ? 'done' : ''}
-                    onClick={() => onToggleItem(item.id, !item.checked)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={(e) => onToggleItem(item.id, e.target.checked)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`${item.text} をカゴに入れた`}
-                    />
-                    {item.text}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {step?.kind === 'checkout' && (
               <button
                 type="button"
                 className="btn primary"
-                style={{ width: '100%', marginBottom: 10 }}
-                disabled={checkedItemCount === 0}
-                onClick={onCheckout}
+                style={{ width: '100%' }}
+                onClick={() => setStepIndex(firstUnfinishedStep(steps, doneStopOrders))}
+                disabled={steps.length === 0}
               >
-                {checkedItemCount > 0
-                  ? `チェック済み${checkedItemCount}件を購入済みにする`
-                  : 'チェック済みの品目がありません'}
+                ナビ開始
               </button>
-            )}
+            </>
+          ) : (
+            <>
+              <div className="row" style={{ marginBottom: 8 }}>
+                <span className={`badge${step?.kind === 'relay' ? ' relay' : ''}`}>
+                  {step?.kind === 'stop' ? step.stopOrder : step?.kind === 'relay' ? '⏩' : '⤷'}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="where">{heading}</div>
+                  <span className="muted">
+                    {stepIndex + 1} / {steps.length}
+                  </span>
+                </div>
+              </div>
 
-            <div className="row">
-              <button type="button" className="btn slim" onClick={() => go(-1)} disabled={stepIndex === 0}>
-                ◀ 前
-              </button>
-              <button
-                type="button"
-                className="btn slim"
-                onClick={() => go(1)}
-                disabled={stepIndex >= steps.length - 1}
-              >
-                次 ▶
-              </button>
-              <span className="spacer" />
-              <button type="button" className="btn slim" onClick={() => setStepIndex(null)}>
-                全体表示
-              </button>
-            </div>
-          </>
-        )}
+              {step?.kind === 'relay' && (
+                <p className="muted" style={{ margin: '0 0 10px' }}>
+                  この先で階が変わります。{step.label}向かってください。
+                </p>
+              )}
+
+              {items.length > 0 && (
+                <ul className="goods nav-goods" style={{ marginBottom: 10 }}>
+                  {items.map((item) => (
+                    <li
+                      key={item.id}
+                      className={item.checked ? 'done' : ''}
+                      onClick={() => onToggleItem(item.id, !item.checked)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) => onToggleItem(item.id, e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`${item.text} をカゴに入れた`}
+                      />
+                      {item.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {step?.kind === 'checkout' && (
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{ width: '100%', marginBottom: 10 }}
+                  disabled={checkedItemCount === 0}
+                  onClick={onCheckout}
+                >
+                  {checkedItemCount > 0
+                    ? `チェック済み${checkedItemCount}件を購入済みにする`
+                    : 'チェック済みの品目がありません'}
+                </button>
+              )}
+
+              <div className="row">
+                <button type="button" className="btn slim" onClick={() => go(-1)} disabled={stepIndex === 0}>
+                  ◀ 前
+                </button>
+                <button
+                  type="button"
+                  className="btn slim"
+                  onClick={() => go(1)}
+                  disabled={stepIndex >= steps.length - 1}
+                >
+                  次 ▶
+                </button>
+                <span className="spacer" />
+                <button type="button" className="btn slim" onClick={() => setStepIndex(null)}>
+                  全体表示
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

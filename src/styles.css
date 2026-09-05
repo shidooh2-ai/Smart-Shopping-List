@@ -70,6 +70,21 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* 地図とパネルは、この.navstageの中で高さを分け合うレイヤー。パネルの高さは
+   以前「中身に合わせて伸び縮み (max-height の範囲で)」させていたが、手順が変わって
+   中身の高さが変わる (品目数・案内文・レジのボタンの有無) たびに地図の表示領域
+   自体も伸び縮みしてしまい、地図のカメラが移動先へ動く演出と重なって
+   「一瞬だけ地図が広がって見える」不具合になっていた。
+   パネルの高さを中身によらない固定の割合にすることで、地図の表示領域を
+   手順が変わっても一切変化しない (実際の画面回転・リサイズのときだけ変わる) ようにし、
+   この不具合が構造的に起きないようにしている。 */
+.navstage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .navmap {
   flex: 1;
   min-height: 0;
@@ -77,8 +92,7 @@
 }
 
 .navpanel {
-  flex: none;
-  max-height: 45%;
+  flex: 0 0 45%;
   overflow-y: auto;
   padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
   background: var(--surface);
